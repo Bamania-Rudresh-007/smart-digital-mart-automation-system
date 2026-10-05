@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build output
+dist/
+**/dist/
+
+# Local configuration and databases
+.env
+**/.env
+!.env.example
+**/.env.example
+!**/.env.example
+server/sdmas.sqlite
+
+# Runtime uploads and logs
+server/uploads/*
+*.log
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
