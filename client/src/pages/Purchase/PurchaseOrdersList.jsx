@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, Plus, CheckCircle, AlertTriangle, FileText, Upload, ShieldAlert } from 'lucide-react';
+import { ShoppingCart, Plus, CheckCircle, AlertTriangle, FileText, Upload, ShieldAlert, ClipboardList, PackageCheck, ReceiptText } from 'lucide-react';
 import Badge from '../../components/Common/Badge';
 import Modal from '../../components/Common/Modal';
 import api from '../../services/api';
@@ -203,6 +203,50 @@ const PurchaseOrdersList = () => {
           <span>Create Purchase Order</span>
         </button>
       </div>
+
+      <section className="rounded-2xl border border-blue-100 bg-blue-50/70 p-5 dark:border-blue-900 dark:bg-blue-950/20">
+        <div className="mb-4">
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white">What does 3-way matching check?</h3>
+          <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+            Before approving payment, the system compares three records for the same purchase:
+          </p>
+        </div>
+        <div className="grid gap-3 md:grid-cols-3">
+          {[
+            {
+              icon: ClipboardList,
+              title: '1. Purchase Order',
+              detail: 'What you ordered: product, quantity, and agreed unit price.'
+            },
+            {
+              icon: PackageCheck,
+              title: '2. Goods Receipt (GRN)',
+              detail: 'What arrived: received quantity and the batch/expiry details entered at receiving.'
+            },
+            {
+              icon: ReceiptText,
+              title: '3. Supplier Invoice',
+              detail: 'What the supplier billed: billed quantity, unit price, and invoice total.'
+            }
+          ].map(step => {
+            const Icon = step.icon;
+            return (
+              <div key={step.title} className="rounded-xl border border-white bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-800 dark:text-white">
+                  <Icon className="h-4 w-4 text-blue-600" /> {step.title}
+                </div>
+                <p className="mt-2 text-[11px] leading-5 text-slate-600 dark:text-slate-400">{step.detail}</p>
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-3 flex items-start gap-2 text-[11px] leading-5 text-slate-600 dark:text-slate-400">
+          <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+          <p>
+            A match means quantities, unit prices, and invoice totals are within the configured tolerance (2% by default), so payment is auto-approved. A discrepancy lists what differs; correct the GRN or invoice, or use the manager's quantity carry-forward/override action.
+          </p>
+        </div>
+      </section>
 
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xs">
         <div className="overflow-x-auto">

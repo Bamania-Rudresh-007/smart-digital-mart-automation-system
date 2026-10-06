@@ -1,6 +1,8 @@
-const { Product, Category, UnitOfMeasure, Store, Batch } = require('../models');
+const crypto = require('crypto');
+const { sequelize, Product, Category, UnitOfMeasure, Store, Batch, StockLedger } = require('../models');
 const ApiResponse = require('../utils/apiResponse');
 const AuditService = require('../services/auditService');
+const ExpiryEngine = require('../services/expiryEngine');
 const { Op } = require('sequelize');
 
 class ProductController {
@@ -79,16 +81,75 @@ class ProductController {
   }
 
   static async createProduct(req, res, next) {
+    let transaction;
     try {
-      const storeId = req.targetStoreId || req.body.store_id;
+      transaction = await sequelize.transaction();
+      const storeId = req.targetStoreId || req.body.store_id || req.user.store_id;
       if (!storeId) {
+        await transaction.rollback();
         return ApiResponse.error(res, 'Store ID is required', 400);
       }
 
+      const {
+        name,
+        category_id,
+        unit_of_measure_id,
+        reorder_threshold,
+        max_stock_level,
+        initial_batch: initialBatch
+      } = req.body;
       const product = await Product.create({
-        ...req.body,
+        sku: `SKU-PENDING-${crypto.randomUUID()}`,
+        name,
+        category_id,
+        unit_of_measure_id: unit_of_measure_id || null,
+        reorder_threshold,
+        max_stock_level,
         store_id: storeId
-      });
+      }, { transaction });
+
+      const skuBase = `SKU-${String(product.id).padStart(6, '0')}`;
+      let sku = skuBase;
+      let suffix = 1;
+      while (await Product.findOne({
+        where: { sku, id: { [Op.ne]: product.id } },
+        transaction
+      })) {
+        sku = `${skuBase}-${suffix}`;
+        suffix += 1;
+      }
+      await product.update({ sku }, { transaction });
+
+      if (initialBatch) {
+        const batchNumber = initialBatch.batch_number ||
+          `B-${sku}-${Date.now().toString(36).toUpperCase()}`;
+        const { status: expiry_status } = ExpiryEngine.classifyExpiry(initialBatch.expiry_date);
+        const batch = await Batch.create({
+          product_id: product.id,
+          batch_number: batchNumber,
+          mfg_date: initialBatch.mfg_date || null,
+          expiry_date: initialBatch.expiry_date,
+          purchase_price: initialBatch.purchase_price,
+          selling_price: initialBatch.selling_price,
+          qty_received: initialBatch.qty_received,
+          qty_remaining: initialBatch.qty_received,
+          supplier_id: initialBatch.supplier_id || null,
+          expiry_status
+        }, { transaction });
+
+        await StockLedger.create({
+          product_id: product.id,
+          batch_id: batch.id,
+          store_id: storeId,
+          txn_type: 'purchase',
+          qty: batch.qty_received,
+          balance_after: batch.qty_remaining,
+          ref_id: `OPENING-BATCH-${batch.id}`,
+          notes: 'Opening inventory on product creation'
+        }, { transaction });
+      }
+
+      await transaction.commit();
 
       await AuditService.logAction({
         userId: req.user.id,
@@ -100,6 +161,7 @@ class ProductController {
 
       return ApiResponse.success(res, 'Product created successfully', product, 201);
     } catch (error) {
+      if (transaction && !transaction.finished) await transaction.rollback();
       next(error);
     }
   }

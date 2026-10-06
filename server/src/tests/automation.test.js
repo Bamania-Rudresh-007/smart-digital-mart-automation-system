@@ -1,5 +1,6 @@
 const ExpiryEngine = require('../services/expiryEngine');
 const ReorderEngine = require('../services/reorderEngine');
+const ProductController = require('../controllers/productController');
 const {
   sequelize,
   Store,
@@ -8,6 +9,7 @@ const {
   Product,
   Category,
   Batch,
+  StockLedger,
   PurchaseOrder,
   POItem,
   Alert
@@ -113,5 +115,61 @@ describe('Expiry detection and automatic reorder workflows', () => {
     expect(purchaseOrder.created_by).toBe(user.id);
     expect(purchaseItem.ordered_qty).toBe(15);
     expect(await Alert.count({ where: { store_id: store.id, type: 'low_stock' } })).toBe(1);
+  });
+
+  test('product creation generates a SKU and records a dated opening batch in the stock ledger', async () => {
+    const store = await Store.create({ name: 'Product Creation Store' });
+    const user = await User.create({
+      name: 'Product Manager',
+      email: 'product-manager@sdmas.com',
+      password_hash: 'hash',
+      store_id: store.id,
+      status: 'active'
+    });
+    const supplier = await Supplier.create({ name: 'Product Creation Supplier' });
+    const category = await Category.create({ name: 'Product Creation Category' });
+    const expiryDate = new Date();
+    expiryDate.setUTCDate(expiryDate.getUTCDate() + 120);
+    const body = {
+      name: 'Fresh Juice 1L',
+      category_id: category.id,
+      reorder_threshold: 5,
+      max_stock_level: 50,
+      initial_batch: {
+        expiry_date: expiryDate.toISOString().slice(0, 10),
+        purchase_price: 35,
+        selling_price: 50,
+        qty_received: 12,
+        supplier_id: supplier.id
+      }
+    };
+    let response;
+    const res = {
+      status(statusCode) {
+        this.statusCode = statusCode;
+        return this;
+      },
+      json(payload) {
+        response = payload;
+        return payload;
+      }
+    };
+
+    await ProductController.createProduct({
+      body,
+      targetStoreId: null,
+      user: { id: user.id, store_id: store.id }
+    }, res, error => {
+      throw error;
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(response.success).toBe(true);
+    expect(response.data.sku).toMatch(/^SKU-\d{6}$/);
+    const batch = await Batch.findOne({ where: { product_id: response.data.id } });
+    expect(batch.batch_number).toContain(response.data.sku);
+    expect(batch.expiry_date).toBe(body.initial_batch.expiry_date);
+    expect(batch.qty_remaining).toBe(12);
+    expect(await StockLedger.count({ where: { batch_id: batch.id, store_id: store.id } })).toBe(1);
   });
 });

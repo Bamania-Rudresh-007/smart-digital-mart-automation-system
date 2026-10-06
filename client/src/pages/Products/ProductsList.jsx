@@ -1,31 +1,61 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Plus, Search, Filter, Edit3, Trash2 } from 'lucide-react';
+import { Package, Plus, Search, ChevronLeft, ChevronRight, RefreshCw, ShoppingBag, Clock3 } from 'lucide-react';
 import Modal from '../../components/Common/Modal';
 import Badge from '../../components/Common/Badge';
 import api from '../../services/api';
+import { useSelector } from 'react-redux';
+
+const EMPTY_FORM = {
+  name: '',
+  category_id: '',
+  unit_of_measure_id: '',
+  reorder_threshold: 10,
+  max_stock_level: 100,
+  add_initial_batch: false,
+  batch_number: '',
+  mfg_date: '',
+  expiry_date: '',
+  purchase_price: '',
+  selling_price: '',
+  qty_received: '',
+  supplier_id: ''
+};
+const SAMPLE_PAGE_SIZE = 8;
+
+const toCategoryName = (category) => category
+  .split('-')
+  .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+  .join(' ');
 
 const ProductsList = () => {
+  const user = useSelector(state => state.auth.user);
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [uoms, setUoms] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
   const [search, setSearch] = useState('');
   const [selectedCat, setSelectedCat] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-
-  const [formData, setFormData] = useState({
-    sku: '',
-    name: '',
-    category_id: '',
-    unit_of_measure_id: '',
-    reorder_threshold: 10,
-    max_stock_level: 100
-  });
+  const [saving, setSaving] = useState(false);
+  const [formData, setFormData] = useState(EMPTY_FORM);
+  const [sampleProducts, setSampleProducts] = useState([]);
+  const [sampleTotal, setSampleTotal] = useState(0);
+  const [sampleSkip, setSampleSkip] = useState(0);
+  const [sampleQuery, setSampleQuery] = useState('');
+  const [sampleSearchInput, setSampleSearchInput] = useState('');
+  const [sampleLoading, setSampleLoading] = useState(false);
+  const [sampleError, setSampleError] = useState('');
+  const [importingId, setImportingId] = useState(null);
 
   useEffect(() => {
     fetchProducts();
     fetchMeta();
   }, [search, selectedCat]);
+
+  useEffect(() => {
+    fetchSampleProducts();
+  }, [sampleQuery, sampleSkip]);
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -54,17 +84,97 @@ const ProductsList = () => {
     } catch (err) {
       console.error(err);
     }
+    try {
+      const supplierRes = await api.get('/suppliers');
+      setSuppliers(supplierRes.data.data || []);
+    } catch (err) {
+      console.warn('Optional supplier list unavailable for opening batch form.', err);
+    }
+  };
+
+  const fetchSampleProducts = async () => {
+    setSampleLoading(true);
+    setSampleError('');
+    try {
+      const query = sampleQuery
+        ? `/products/search?q=${encodeURIComponent(sampleQuery)}&limit=${SAMPLE_PAGE_SIZE}&skip=${sampleSkip}&select=id,title,description,category,price,thumbnail,brand`
+        : `/products?limit=${SAMPLE_PAGE_SIZE}&skip=${sampleSkip}&select=id,title,description,category,price,thumbnail,brand`;
+      const response = await fetch(`https://dummyjson.com${query}`);
+      if (!response.ok) throw new Error(`Product catalog request failed (${response.status}).`);
+      const data = await response.json();
+      if (!Array.isArray(data.products)) throw new Error('The sample catalog returned an invalid response.');
+      setSampleProducts(data.products);
+      setSampleTotal(Number(data.total) || 0);
+    } catch (error) {
+      setSampleError(error.message || 'Unable to load sample products.');
+      setSampleProducts([]);
+    } finally {
+      setSampleLoading(false);
+    }
+  };
+
+  const updateForm = (field, value) => {
+    setFormData(current => ({ ...current, [field]: value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSaving(true);
     try {
-      await api.post('/products', formData);
+      const payload = {
+        name: formData.name.trim(),
+        category_id: Number(formData.category_id),
+        unit_of_measure_id: formData.unit_of_measure_id ? Number(formData.unit_of_measure_id) : null,
+        reorder_threshold: Number(formData.reorder_threshold),
+        max_stock_level: Number(formData.max_stock_level),
+        store_id: user?.store?.id
+      };
+      if (formData.add_initial_batch) {
+        payload.initial_batch = {
+          batch_number: formData.batch_number.trim(),
+          mfg_date: formData.mfg_date || null,
+          expiry_date: formData.expiry_date,
+          purchase_price: Number(formData.purchase_price),
+          selling_price: Number(formData.selling_price),
+          qty_received: Number(formData.qty_received),
+          supplier_id: formData.supplier_id ? Number(formData.supplier_id) : null
+        };
+      }
+      await api.post('/products', payload);
       setIsModalOpen(false);
-      setFormData({ sku: '', name: '', category_id: '', unit_of_measure_id: '', reorder_threshold: 10, max_stock_level: 100 });
-      fetchProducts();
+      setFormData(EMPTY_FORM);
+      await fetchProducts();
     } catch (err) {
       alert(err.response?.data?.message || 'Error saving product');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addSampleToInventory = async (sample) => {
+    setImportingId(sample.id);
+    try {
+      const categoryName = toCategoryName(sample.category || 'Other');
+      let category = categories.find(item => item.name.toLowerCase() === categoryName.toLowerCase());
+      if (!category) {
+        const response = await api.post('/products/meta/categories', { name: categoryName });
+        category = response.data.data;
+        setCategories(current => [...current, category]);
+      }
+
+      await api.post('/products', {
+        name: sample.title,
+        category_id: category.id,
+        reorder_threshold: 10,
+        max_stock_level: 100,
+        store_id: user?.store?.id
+      });
+      await fetchProducts();
+      alert(`${sample.title} was added to your product catalog. Add a batch to record actual store stock.`);
+    } catch (error) {
+      alert(error.response?.data?.message || error.message || 'Unable to add this sample product.');
+    } finally {
+      setImportingId(null);
     }
   };
 
@@ -73,16 +183,112 @@ const ProductsList = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Product Catalog & Master</h2>
-          <p className="text-xs text-slate-500">Manage store items, reorder thresholds, and SKU levels</p>
+          <p className="text-xs text-slate-500">Manage products, automatically assigned SKUs, and batch-level stock</p>
         </div>
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => { setFormData(EMPTY_FORM); setIsModalOpen(true); }}
           className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs flex items-center space-x-2 shadow-lg shadow-blue-600/20 transition-all"
         >
           <Plus className="w-4 h-4" />
           <span>Add New Product</span>
         </button>
       </div>
+
+      <section className="space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <ShoppingBag className="w-5 h-5 text-blue-600" />
+              Product samples
+            </h3>
+            <p className="text-xs text-slate-500">Live demo listings from DummyJSON. Add a sample to your own catalog when useful.</p>
+          </div>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              setSampleSkip(0);
+              setSampleQuery(sampleSearchInput.trim());
+            }}
+            className="flex gap-2"
+          >
+            <input
+              value={sampleSearchInput}
+              onChange={event => setSampleSearchInput(event.target.value)}
+              placeholder="Search sample products"
+              aria-label="Search sample products"
+              className="min-w-0 px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"
+            />
+            <button className="px-3 py-2 bg-slate-900 dark:bg-slate-700 text-white rounded-xl text-xs font-bold">
+              Search
+            </button>
+          </form>
+        </div>
+
+        {sampleError && (
+          <div className="flex items-center justify-between gap-3 p-4 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-xs">
+            <span>{sampleError} Check your internet connection and try again.</span>
+            <button onClick={fetchSampleProducts} className="flex shrink-0 items-center gap-1 font-bold">
+              <RefreshCw className="w-3.5 h-3.5" /> Retry
+            </button>
+          </div>
+        )}
+
+        {sampleLoading ? (
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 text-center text-sm text-slate-500">
+            Loading live product samples…
+          </div>
+        ) : sampleProducts.length > 0 ? (
+          <>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {sampleProducts.map(sample => (
+                <article key={sample.id} className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+                  <div className="h-40 bg-slate-100 dark:bg-slate-800">
+                    <img src={sample.thumbnail} alt={sample.title} loading="lazy" className="h-full w-full object-contain" />
+                  </div>
+                  <div className="space-y-2 p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <h4 className="line-clamp-2 min-h-10 text-sm font-bold text-slate-900 dark:text-white">{sample.title}</h4>
+                      <span className="shrink-0 font-bold text-emerald-600">${Number(sample.price).toFixed(2)}</span>
+                    </div>
+                    <p className="text-[11px] capitalize text-slate-500">{toCategoryName(sample.category || 'Other')} {sample.brand ? `· ${sample.brand}` : ''}</p>
+                    <p className="line-clamp-2 min-h-8 text-[11px] text-slate-500">{sample.description}</p>
+                    <button
+                      onClick={() => addSampleToInventory(sample)}
+                      disabled={importingId === sample.id}
+                      className="w-full rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white hover:bg-blue-500 disabled:opacity-60"
+                    >
+                      {importingId === sample.id ? 'Adding…' : 'Add to my catalog'}
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+            <div className="flex items-center justify-between text-xs text-slate-500">
+              <span>
+                Showing {sampleSkip + 1}–{Math.min(sampleSkip + sampleProducts.length, sampleTotal)} of {sampleTotal} sample products
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setSampleSkip(Math.max(0, sampleSkip - SAMPLE_PAGE_SIZE))}
+                  disabled={sampleSkip === 0}
+                  className="rounded-lg border border-slate-200 dark:border-slate-700 p-2 disabled:opacity-40"
+                  aria-label="Previous sample products"
+                ><ChevronLeft className="h-4 w-4" /></button>
+                <button
+                  onClick={() => setSampleSkip(sampleSkip + SAMPLE_PAGE_SIZE)}
+                  disabled={sampleSkip + SAMPLE_PAGE_SIZE >= sampleTotal}
+                  className="rounded-lg border border-slate-200 dark:border-slate-700 p-2 disabled:opacity-40"
+                  aria-label="Next sample products"
+                ><ChevronRight className="h-4 w-4" /></button>
+              </div>
+            </div>
+          </>
+        ) : !sampleError ? (
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 text-center text-sm text-slate-500">
+            No sample products found.
+          </div>
+        ) : null}
+      </section>
 
       {/* Filter bar */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row gap-3">
@@ -150,18 +356,19 @@ const ProductsList = () => {
       </div>
 
       {/* Modal */}
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Create New Store Product">
-        <form onSubmit={handleSubmit} className="space-y-4">
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add Product to Store">
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs text-blue-800">
+            Product ID and SKU are generated automatically when you save. Record each delivery as a batch so its quantity and expiry date can be tracked separately.
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">SKU Code</label>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">Product ID / SKU</label>
               <input
                 type="text"
-                required
-                value={formData.sku}
-                onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                placeholder="SKU-ITEM-001"
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"
+                value="Assigned automatically on save"
+                readOnly
+                className="w-full cursor-not-allowed px-3 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-500"
               />
             </div>
             <div>
@@ -170,8 +377,8 @@ const ProductsList = () => {
                 type="text"
                 required
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Amul Milk 1L"
+                onChange={(e) => updateForm('name', e.target.value)}
+                placeholder="e.g. Whole milk, 1 litre"
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"
               />
             </div>
@@ -183,7 +390,7 @@ const ProductsList = () => {
               <select
                 required
                 value={formData.category_id}
-                onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
+                onChange={(e) => updateForm('category_id', e.target.value)}
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"
               >
                 <option value="">Select Category</option>
@@ -194,7 +401,7 @@ const ProductsList = () => {
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">Unit of Measure</label>
               <select
                 value={formData.unit_of_measure_id}
-                onChange={(e) => setFormData({ ...formData, unit_of_measure_id: e.target.value })}
+                onChange={(e) => updateForm('unit_of_measure_id', e.target.value)}
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"
               >
                 <option value="">Select UOM</option>
@@ -210,7 +417,7 @@ const ProductsList = () => {
                 type="number"
                 min="0"
                 value={formData.reorder_threshold}
-                onChange={(e) => setFormData({ ...formData, reorder_threshold: parseInt(e.target.value, 10) })}
+                onChange={(e) => updateForm('reorder_threshold', e.target.value)}
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"
               />
             </div>
@@ -220,17 +427,73 @@ const ProductsList = () => {
                 type="number"
                 min="1"
                 value={formData.max_stock_level}
-                onChange={(e) => setFormData({ ...formData, max_stock_level: parseInt(e.target.value, 10) })}
+                onChange={(e) => updateForm('max_stock_level', e.target.value)}
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"
               />
             </div>
           </div>
 
+          <label className="flex items-start gap-3 rounded-xl border border-slate-200 dark:border-slate-700 p-3">
+            <input
+              type="checkbox"
+              checked={formData.add_initial_batch}
+              onChange={event => updateForm('add_initial_batch', event.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-blue-600"
+            />
+            <span>
+              <span className="block text-xs font-bold text-slate-800 dark:text-white">Add opening batch and stock</span>
+              <span className="block mt-1 text-[11px] text-slate-500">Use this for food, beverages, cosmetics, or other dated goods. Every batch has its own expiry date.</span>
+            </span>
+          </label>
+
+          {formData.add_initial_batch && (
+            <div className="space-y-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 p-4">
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-800 dark:text-white">
+                <Clock3 className="h-4 w-4 text-blue-600" /> Opening batch details
+              </div>
+              <p className="text-[11px] text-slate-500">Batch number is generated if left blank. Enter the label's expiry date for perishable products.</p>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                  Batch / lot number (optional)
+                  <input value={formData.batch_number} onChange={event => updateForm('batch_number', event.target.value)} className="mt-1 w-full rounded-lg border bg-white px-3 py-2 dark:bg-slate-900" placeholder="Generated automatically" />
+                </label>
+                <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                  Manufacturing date
+                  <input type="date" value={formData.mfg_date} onChange={event => updateForm('mfg_date', event.target.value)} className="mt-1 w-full rounded-lg border bg-white px-3 py-2 dark:bg-slate-900" />
+                </label>
+                <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                  Expiry / best-before date *
+                  <input type="date" required value={formData.expiry_date} onChange={event => updateForm('expiry_date', event.target.value)} className="mt-1 w-full rounded-lg border bg-white px-3 py-2 dark:bg-slate-900" />
+                </label>
+                <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                  Opening quantity *
+                  <input type="number" min="1" required value={formData.qty_received} onChange={event => updateForm('qty_received', event.target.value)} className="mt-1 w-full rounded-lg border bg-white px-3 py-2 dark:bg-slate-900" placeholder="e.g. 24" />
+                </label>
+                <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                  Purchase cost per unit *
+                  <input type="number" min="0.01" step="0.01" required value={formData.purchase_price} onChange={event => updateForm('purchase_price', event.target.value)} className="mt-1 w-full rounded-lg border bg-white px-3 py-2 dark:bg-slate-900" placeholder="0.00" />
+                </label>
+                <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                  Selling price per unit *
+                  <input type="number" min="0.01" step="0.01" required value={formData.selling_price} onChange={event => updateForm('selling_price', event.target.value)} className="mt-1 w-full rounded-lg border bg-white px-3 py-2 dark:bg-slate-900" placeholder="0.00" />
+                </label>
+                <label className="col-span-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                  Supplier (optional)
+                  <select value={formData.supplier_id} onChange={event => updateForm('supplier_id', event.target.value)} className="mt-1 w-full rounded-lg border bg-white px-3 py-2 dark:bg-slate-900">
+                    <option value="">Select supplier</option>
+                    {suppliers.map(supplier => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}
+                  </select>
+                </label>
+              </div>
+            </div>
+          )}
+
           <button
             type="submit"
+            disabled={saving}
             className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs transition-colors mt-2"
           >
-            Create Product
+            {saving ? 'Saving product…' : 'Save Product'}
           </button>
         </form>
       </Modal>
