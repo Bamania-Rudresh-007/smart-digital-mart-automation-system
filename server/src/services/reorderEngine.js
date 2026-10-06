@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const { Product, Batch, PurchaseOrder, POItem, Supplier, Alert } = require('../models');
+const { sequelize, Product, Batch, PurchaseOrder, POItem, Supplier, Alert, User, Role } = require('../models');
 const { broadcastAlert } = require('../sockets/socketManager');
 const logger = require('../utils/logger');
 
@@ -7,7 +7,7 @@ class ReorderEngine {
   /**
    * Evaluates all products in a store (or across all stores) for low-stock reorder triggers.
    */
-  static async checkAndGenerateReorders(storeId = null) {
+  static async checkAndGenerateReorders(storeId = null, createdBy = null) {
     const whereClause = storeId ? { store_id: storeId } : {};
     const products = await Product.findAll({
       where: whereClause,
@@ -18,6 +18,25 @@ class ReorderEngine {
 
     const generatedPOs = [];
     const todayStr = new Date().toISOString().split('T')[0];
+    let creatorId = createdBy;
+
+    if (!creatorId) {
+      const systemAdmin = await User.findOne({
+        where: { status: 'active' },
+        include: [{
+          model: Role,
+          as: 'roles',
+          where: { role_name: 'Super Admin' },
+          through: { attributes: [] }
+        }]
+      });
+
+      if (!systemAdmin) {
+        throw new Error('Cannot generate automatic reorders: no active Super Admin account exists.');
+      }
+
+      creatorId = systemAdmin.id;
+    }
 
     for (const product of products) {
       // Calculate current active non-expired stock
@@ -47,12 +66,19 @@ class ReorderEngine {
         }
 
         // Determine default supplier from existing batches or default supplier
-        const lastBatch = product.batches.find(b => b.supplier_id);
+        const lastBatch = product.batches
+          .filter(b => b.supplier_id)
+          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
         let supplierId = lastBatch ? lastBatch.supplier_id : null;
 
         if (!supplierId) {
           const firstSupplier = await Supplier.findOne();
-          supplierId = firstSupplier ? firstSupplier.id : 1;
+          supplierId = firstSupplier ? firstSupplier.id : null;
+        }
+
+        if (!supplierId) {
+          logger.error(`Cannot auto-reorder product "${product.name}": no supplier is configured.`);
+          continue;
         }
 
         const suggestedQty = Math.max(product.max_stock_level - currentStock, 10);
@@ -60,31 +86,40 @@ class ReorderEngine {
 
         const poNumber = `PO-AUTO-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
-        const draftPO = await PurchaseOrder.create({
-          po_number: poNumber,
-          supplier_id: supplierId,
-          store_id: product.store_id,
-          status: 'Draft',
-          created_by: 1, // System automated user
-          is_auto_generated: true
-        });
+        const transaction = await sequelize.transaction();
+        let draftPO;
+        let alert;
+        try {
+          draftPO = await PurchaseOrder.create({
+            po_number: poNumber,
+            supplier_id: supplierId,
+            store_id: product.store_id,
+            status: 'Draft',
+            created_by: creatorId,
+            is_auto_generated: true
+          }, { transaction });
 
-        await POItem.create({
-          po_id: draftPO.id,
-          product_id: product.id,
-          ordered_qty: suggestedQty,
-          agreed_unit_price: lastPrice
-        });
+          await POItem.create({
+            po_id: draftPO.id,
+            product_id: product.id,
+            ordered_qty: suggestedQty,
+            agreed_unit_price: lastPrice
+          }, { transaction });
 
-        // Trigger Alert
-        const alert = await Alert.create({
-          store_id: product.store_id,
-          type: 'low_stock',
-          reference_id: `PO-${draftPO.id}`,
-          message: `Low stock breach for "${product.name}" (Stock: ${currentStock}, Threshold: ${product.reorder_threshold}). Auto-generated Draft PO ${poNumber}.`,
-          status: 'new',
-          sent_channels: 'in-app,email'
-        });
+          alert = await Alert.create({
+            store_id: product.store_id,
+            type: 'low_stock',
+            reference_id: `PO-${draftPO.id}`,
+            message: `Low stock breach for "${product.name}" (Stock: ${currentStock}, Threshold: ${product.reorder_threshold}). Auto-generated Draft PO ${poNumber}.`,
+            status: 'new',
+            sent_channels: 'in-app,email'
+          }, { transaction });
+
+          await transaction.commit();
+        } catch (error) {
+          if (!transaction.finished) await transaction.rollback();
+          throw error;
+        }
 
         broadcastAlert(product.store_id, alert);
         generatedPOs.push(draftPO);

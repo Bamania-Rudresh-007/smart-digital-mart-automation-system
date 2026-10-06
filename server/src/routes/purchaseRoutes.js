@@ -6,7 +6,7 @@ const PurchaseController = require('../controllers/purchaseController');
 const { authenticate } = require('../middleware/auth');
 const { requirePermission, enforceStoreScope } = require('../middleware/rbac');
 const validate = require('../middleware/validate');
-const { poSchema, grnSchema, vendorInvoiceSchema, overrideSchema } = require('../validators/purchaseSchemas');
+const { poSchema, grnSchema, vendorInvoiceSchema, overrideSchema, quantityResolutionSchema } = require('../validators/purchaseSchemas');
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, path.resolve(__dirname, '../../uploads')),
@@ -24,6 +24,7 @@ router.put('/:id/status', requirePermission('PurchaseOrders', 'update'), Purchas
 
 router.post('/grn', requirePermission('GRN', 'create'), validate(grnSchema), PurchaseController.createGRN);
 router.post('/invoice', requirePermission('VendorInvoices', 'create'), upload.single('invoice_file'), validate(vendorInvoiceSchema), PurchaseController.createVendorInvoice);
+router.post('/accept-received-quantity', requirePermission('PurchaseOrders', 'approve'), validate(quantityResolutionSchema), PurchaseController.acceptReceivedQuantity);
 router.post('/override', requirePermission('PurchaseOrders', 'approve'), validate(overrideSchema), PurchaseController.overrideDiscrepancy);
 
 module.exports = router;

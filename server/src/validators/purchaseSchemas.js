@@ -46,9 +46,15 @@ const overrideSchema = Joi.object({
   remarks: Joi.string().required().min(5)
 });
 
+const quantityResolutionSchema = Joi.object({
+  po_id: Joi.number().integer().required(),
+  remarks: Joi.string().required().min(5)
+});
+
 module.exports = {
   poSchema,
   grnSchema,
   vendorInvoiceSchema,
-  overrideSchema
+  overrideSchema,
+  quantityResolutionSchema
 };

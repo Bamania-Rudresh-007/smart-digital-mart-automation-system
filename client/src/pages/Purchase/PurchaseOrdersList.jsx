@@ -60,17 +60,40 @@ const PurchaseOrdersList = () => {
     }
   };
 
+  const getOutstandingGRNItems = (po) => {
+    const receivedByProduct = new Map();
+    (po.goodsReceipts || []).forEach(receipt => {
+      (receipt.items || []).forEach(item => {
+        receivedByProduct.set(
+          item.product_id,
+          (receivedByProduct.get(item.product_id) || 0) + Number(item.received_qty)
+        );
+      });
+    });
+    return po.items.map(item => ({
+      ...item,
+      remaining_qty: Math.max(0, Number(item.ordered_qty) - (receivedByProduct.get(item.product_id) || 0))
+    }))
+      .filter(item => item.remaining_qty > 0)
+      .map(item => ({
+        product_id: item.product_id,
+        product_name: item.product?.name,
+        batch_number: `B-${item.product?.sku || 'GRN'}-${Date.now().toString().slice(-4)}`,
+        expiry_date: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        received_qty: item.remaining_qty,
+        purchase_price: item.agreed_unit_price,
+        selling_price: (parseFloat(item.agreed_unit_price) * 1.2).toFixed(2)
+      }));
+  };
+
   const openGRN = (po) => {
     setSelectedPO(po);
-    const items = po.items.map(item => ({
-      product_id: item.product_id,
-      product_name: item.product?.name,
-      batch_number: `B-${item.product?.sku || 'GRN'}-${Date.now().toString().slice(-4)}`,
-      expiry_date: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      received_qty: item.ordered_qty,
-      purchase_price: item.agreed_unit_price,
-      selling_price: (parseFloat(item.agreed_unit_price) * 1.2).toFixed(2)
-    }));
+    const items = getOutstandingGRNItems(po);
+    if (items.length === 0) {
+      alert('There is no outstanding quantity to receive for this purchase order.');
+      return;
+    }
+
     setGrnItems(items);
     setIsGRNModal(true);
   };
@@ -112,6 +135,35 @@ const PurchaseOrdersList = () => {
       fetchPOs();
     } catch (err) {
       alert(err.response?.data?.message || 'Error submitting invoice');
+    }
+  };
+
+  const updateInvoiceItem = (index, field, value) => {
+    const parsedValue = value === '' ? '' : Number(value);
+    setInvoiceForm(current => {
+      const items = current.items.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, [field]: parsedValue } : item
+      );
+      const invoiceAmount = items.reduce(
+        (sum, item) => sum + Number(item.billed_qty || 0) * Number(item.billed_unit_price || 0),
+        0
+      );
+      return { ...current, items, invoice_amount: invoiceAmount };
+    });
+  };
+
+  const acceptReceivedQuantity = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post('/purchases/accept-received-quantity', {
+        po_id: selectedPO.id,
+        remarks: overrideRemarks
+      });
+      setIsOverrideModal(false);
+      setOverrideRemarks('');
+      fetchPOs();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Error accepting received quantity');
     }
   };
 
@@ -192,21 +244,31 @@ const PurchaseOrdersList = () => {
                       </button>
                     )}
 
-                    {(po.status === 'Sent' || po.status === 'Partially Received') && (
+                    {(po.status === 'Sent' || po.status === 'Partially Received' ||
+                      (po.status === 'Discrepancy' && getOutstandingGRNItems(po).length > 0)) && (
                       <button onClick={() => openGRN(po)} className="px-2.5 py-1 bg-purple-100 text-purple-800 rounded-lg font-bold text-[11px]">
-                        Receive GRN
+                        {po.status === 'Discrepancy' ? 'Correct GRN' : 'Receive GRN'}
                       </button>
                     )}
 
-                    {(po.status === 'Fully Received' || po.status === 'Sent') && (
+                    {(po.status === 'Fully Received' || po.status === 'Partially Received' || po.status === 'Sent' || po.status === 'Discrepancy') && (
                       <button onClick={() => openInvoice(po)} className="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-lg font-bold text-[11px]">
-                        Log Invoice
+                        {po.status === 'Discrepancy' ? 'Correct Invoice' : 'Log Invoice'}
                       </button>
                     )}
 
-                    {po.status === 'Discrepancy' && (
+                    {po.status === 'Discrepancy' && po.match?.remarks?.toLowerCase().includes('quantity') && (
                       <button
-                        onClick={() => { setSelectedPO(po); setIsOverrideModal(true); }}
+                        onClick={() => { setSelectedPO(po); setOverrideRemarks(''); setIsOverrideModal(true); }}
+                        className="px-2.5 py-1 bg-amber-100 text-amber-900 rounded-lg font-bold text-[11px]"
+                      >
+                        Accept Qty & Carry Forward
+                      </button>
+                    )}
+
+                    {po.status === 'Discrepancy' && !po.match?.remarks?.toLowerCase().includes('quantity') && (
+                      <button
+                        onClick={() => { setSelectedPO(po); setOverrideRemarks(''); setIsOverrideModal(true); }}
                         className="px-2.5 py-1 bg-rose-600 text-white rounded-lg font-bold text-[11px]"
                       >
                         Manager Override
@@ -400,6 +462,33 @@ const PurchaseOrdersList = () => {
               className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs font-bold text-emerald-600"
             />
           </div>
+          <div className="space-y-2">
+            <p className="text-[11px] font-bold uppercase text-slate-400">Invoice Line Items</p>
+            {invoiceForm.items.map((item, index) => (
+              <div key={item.product_id} className="grid grid-cols-[1fr_90px_110px] items-center gap-2">
+                <span className="text-xs font-medium text-slate-700 dark:text-slate-300">{item.product_name}</span>
+                <input
+                  type="number"
+                  min="1"
+                  required
+                  aria-label={`Billed quantity for ${item.product_name}`}
+                  value={item.billed_qty}
+                  onChange={event => updateInvoiceItem(index, 'billed_qty', event.target.value)}
+                  className="px-2 py-2 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs"
+                />
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  required
+                  aria-label={`Billed unit price for ${item.product_name}`}
+                  value={item.billed_unit_price}
+                  onChange={event => updateInvoiceItem(index, 'billed_unit_price', event.target.value)}
+                  className="px-2 py-2 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs"
+                />
+              </div>
+            ))}
+          </div>
 
           <button type="submit" className="w-full py-3 bg-emerald-600 text-white font-bold rounded-xl text-xs">
             Submit Invoice & Run 3-Way Match Check
@@ -409,10 +498,19 @@ const PurchaseOrdersList = () => {
 
       {/* Manager Override Modal */}
       <Modal isOpen={isOverrideModal} onClose={() => setIsOverrideModal(false)} title={`Manager Override for ${selectedPO?.po_number}`}>
-        <form onSubmit={submitOverride} className="space-y-4">
+        <form
+          onSubmit={selectedPO?.match?.remarks?.toLowerCase().includes('quantity')
+            ? acceptReceivedQuantity
+            : submitOverride}
+          className="space-y-4"
+        >
           <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl flex items-center space-x-2 text-rose-500 text-xs">
             <ShieldAlert className="w-5 h-5 shrink-0" />
-            <span>3-Way Match discrepancy detected. Override requires a mandatory logged audit reason.</span>
+            <span>
+              {selectedPO?.match?.remarks?.toLowerCase().includes('quantity')
+                ? 'Accept the received quantity; any outstanding quantity will be carried forward to a new draft purchase order.'
+                : '3-Way Match discrepancy detected. Override requires a mandatory logged audit reason.'}
+            </span>
           </div>
 
           <div>
@@ -422,13 +520,17 @@ const PurchaseOrdersList = () => {
               rows={3}
               value={overrideRemarks}
               onChange={(e) => setOverrideRemarks(e.target.value)}
-              placeholder="e.g. Price discrepancy approved by regional procurement lead due to raw material rate hike."
+              placeholder={selectedPO?.match?.remarks?.toLowerCase().includes('quantity')
+                ? 'Explain why the received quantity is accepted and the outstanding quantity carried forward.'
+                : 'e.g. Price discrepancy approved by regional procurement lead due to raw material rate hike.'}
               className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs"
             />
           </div>
 
           <button type="submit" className="w-full py-3 bg-rose-600 text-white font-bold rounded-xl text-xs">
-            Confirm Manager Override & Approve PO
+            {selectedPO?.match?.remarks?.toLowerCase().includes('quantity')
+              ? 'Accept Received Quantity & Carry Remainder Forward'
+              : 'Confirm Manager Override & Approve PO'}
           </button>
         </form>
       </Modal>

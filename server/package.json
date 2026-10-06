@@ -8,7 +8,8 @@
     "dev": "nodemon src/server.js",
     "test": "jest --runInBand --detectOpenHandles",
     "db:migrate": "node src/scripts/migrate.js",
-    "db:seed": "node src/scripts/seed.js"
+    "db:seed": "node src/scripts/seed.js",
+    "db:admin": "node src/scripts/provisionSuperAdmin.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

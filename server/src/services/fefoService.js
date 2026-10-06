@@ -1,6 +1,7 @@
 const { Op } = require('sequelize');
 const { sequelize, Batch, Product, Sale, SaleItem, StockLedger } = require('../models');
 const { broadcastStockUpdate } = require('../sockets/socketManager');
+const ReorderEngine = require('./reorderEngine');
 const logger = require('../utils/logger');
 
 class FefoService {
@@ -118,6 +119,12 @@ class FefoService {
       await transaction.commit();
 
       logger.info(`Sale processed successfully: Invoice ${invoiceNo}, Total ${netAmount}`);
+
+      try {
+        await ReorderEngine.checkAndGenerateReorders(store_id, cashier_id);
+      } catch (reorderError) {
+        logger.error(`Automatic reorder check failed after checkout ${invoiceNo}: ${reorderError.message}`);
+      }
 
       return {
         sale: saleRecord,

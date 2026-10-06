@@ -7,6 +7,12 @@ const logger = require('../utils/logger');
 
 async function seedDatabase() {
   try {
+    const superAdminEmail = process.env.SUPERADMIN_EMAIL || 'rudresh@gmail.com';
+    const superAdminPassword = process.env.SUPERADMIN_PASSWORD;
+    if (!superAdminPassword || superAdminPassword.length < 8) {
+      throw new Error('Set SUPERADMIN_PASSWORD to a value containing at least 8 characters before seeding.');
+    }
+
     logger.info('Syncing database...');
     await sequelize.sync({ force: true });
     logger.info('Database synced successfully.');
@@ -61,9 +67,10 @@ async function seedDatabase() {
     // 3. Seed Users
     logger.info('Seeding Users...');
     const passwordHash = await bcrypt.hash('Password@123', 10);
+    const superAdminPasswordHash = await bcrypt.hash(superAdminPassword, 10);
 
     const userSeedData = [
-      { name: 'System Super Admin', email: 'superadmin@sdmas.com', phone: '9999900001', role: 'Super Admin', store_id: mainStore.id },
+      { name: 'Rudresh Super Admin', email: superAdminEmail, phone: '9999900001', role: 'Super Admin', store_id: mainStore.id, password_hash: superAdminPasswordHash },
       { name: 'Rajesh Store Manager', email: 'manager@sdmas.com', phone: '9999900002', role: 'Store Manager', store_id: mainStore.id },
       { name: 'Amit Inventory Lead', email: 'inventory@sdmas.com', phone: '9999900003', role: 'Inventory Staff', store_id: mainStore.id },
       { name: 'Priya Procurement Officer', email: 'procurement@sdmas.com', phone: '9999900004', role: 'Procurement Officer', store_id: mainStore.id },
@@ -76,7 +83,7 @@ async function seedDatabase() {
         name: u.name,
         email: u.email,
         phone: u.phone,
-        password_hash: passwordHash,
+        password_hash: u.password_hash || passwordHash,
         store_id: u.store_id,
         status: 'active'
       });
@@ -261,11 +268,14 @@ async function seedDatabase() {
   } catch (error) {
     logger.error('Error seeding database: ' + error.message);
     console.error(error);
+    throw error;
   }
 }
 
 if (require.main === module) {
-  seedDatabase().then(() => process.exit(0));
+  seedDatabase()
+    .then(() => process.exit(0))
+    .catch(() => process.exit(1));
 }
 
 module.exports = seedDatabase;

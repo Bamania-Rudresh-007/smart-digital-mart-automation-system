@@ -1,6 +1,7 @@
-const { PurchaseOrder, POItem, GoodsReceipt, GRNItem, VendorInvoice, InvoiceItem, PurchaseMatch, Supplier, Product, Batch, StockLedger, User } = require('../models');
+const { sequelize, PurchaseOrder, POItem, GoodsReceipt, GRNItem, VendorInvoice, InvoiceItem, PurchaseMatch, Supplier, Product, Batch, StockLedger, User } = require('../models');
 const ApiResponse = require('../utils/apiResponse');
 const MatchingEngine = require('../services/matchingEngine');
+const ExpiryEngine = require('../services/expiryEngine');
 const AuditService = require('../services/auditService');
 
 class PurchaseController {
@@ -16,6 +17,7 @@ class PurchaseController {
           { model: Supplier, as: 'supplier' },
           { model: User, as: 'creator', attributes: ['id', 'name', 'email'] },
           { model: POItem, as: 'items', include: [{ model: Product, as: 'product' }] },
+          { model: GoodsReceipt, as: 'goodsReceipts', include: [{ model: GRNItem, as: 'items' }] },
           { model: PurchaseMatch, as: 'match' }
         ],
         order: [['createdAt', 'DESC']]
@@ -117,10 +119,57 @@ class PurchaseController {
 
   // --- GOODS RECEIPT NOTE (GRN) ---
   static async createGRN(req, res, next) {
+    let transaction;
     try {
+      transaction = await sequelize.transaction();
       const { po_id, items } = req.body;
-      const po = await PurchaseOrder.findByPk(po_id);
-      if (!po) return ApiResponse.error(res, 'Purchase Order not found', 404);
+      const po = await PurchaseOrder.findByPk(po_id, { transaction });
+      if (!po) {
+        await transaction.rollback();
+        return ApiResponse.error(res, 'Purchase Order not found', 404);
+      }
+      if (!['Sent', 'Partially Received', 'Discrepancy'].includes(po.status)) {
+        await transaction.rollback();
+        return ApiResponse.error(res, `Cannot receive goods for a PO in '${po.status}' status`, 400);
+      }
+
+      const orderItems = await POItem.findAll({ where: { po_id }, transaction });
+      const orderedByProduct = new Map();
+      for (const orderItem of orderItems) {
+        orderedByProduct.set(
+          orderItem.product_id,
+          (orderedByProduct.get(orderItem.product_id) || 0) + Number(orderItem.ordered_qty)
+        );
+      }
+
+      const existingReceipts = await GoodsReceipt.findAll({
+        where: { po_id },
+        include: [{ model: GRNItem, as: 'items' }],
+        transaction
+      });
+      const receivedByProduct = new Map();
+      for (const receipt of existingReceipts) {
+        for (const receiptItem of receipt.items) {
+          receivedByProduct.set(
+            receiptItem.product_id,
+            (receivedByProduct.get(receiptItem.product_id) || 0) + Number(receiptItem.received_qty)
+          );
+        }
+      }
+
+      for (const item of items) {
+        if (!orderedByProduct.has(item.product_id)) {
+          await transaction.rollback();
+          return ApiResponse.error(res, `Product ID ${item.product_id} is not part of this Purchase Order`, 400);
+        }
+
+        const previouslyReceived = receivedByProduct.get(item.product_id) || 0;
+        if (previouslyReceived + Number(item.received_qty) > orderedByProduct.get(item.product_id)) {
+          await transaction.rollback();
+          return ApiResponse.error(res, `Received quantity exceeds the outstanding quantity for Product ID ${item.product_id}`, 400);
+        }
+        receivedByProduct.set(item.product_id, previouslyReceived + Number(item.received_qty));
+      }
 
       const grnNumber = `GRN-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
 
@@ -129,16 +178,11 @@ class PurchaseController {
         po_id,
         received_by: req.user.id,
         received_date: new Date()
-      });
+      }, { transaction });
 
       for (const item of items) {
         // Create batch for received product
-        const today = new Date();
-        const expDate = new Date(item.expiry_date);
-        const diffDays = Math.ceil((expDate - today) / (1000 * 60 * 60 * 24));
-        let expiry_status = 'Healthy';
-        if (diffDays <= 0) expiry_status = 'Expired';
-        else if (diffDays <= 30) expiry_status = 'Near Expiry';
+        const { status: expiry_status } = ExpiryEngine.classifyExpiry(item.expiry_date);
 
         const batch = await Batch.create({
           product_id: item.product_id,
@@ -151,14 +195,14 @@ class PurchaseController {
           qty_remaining: item.received_qty,
           supplier_id: po.supplier_id,
           expiry_status
-        });
+        }, { transaction });
 
         await GRNItem.create({
           grn_id: grn.id,
           product_id: item.product_id,
           batch_id: batch.id,
           received_qty: item.received_qty
-        });
+        }, { transaction });
 
         // Write immutable stock ledger
         await StockLedger.create({
@@ -170,37 +214,69 @@ class PurchaseController {
           balance_after: batch.qty_remaining,
           ref_id: grnNumber,
           notes: `GRN Entry for PO ${po.po_number}`
-        });
+        }, { transaction });
       }
 
-      po.status = 'Fully Received';
-      await po.save();
+      const hasOutstandingQuantity = orderItems.some(orderItem =>
+        (receivedByProduct.get(orderItem.product_id) || 0) < Number(orderItem.ordered_qty)
+      );
+      po.status = hasOutstandingQuantity ? 'Partially Received' : 'Fully Received';
+      await po.save({ transaction });
+      await transaction.commit();
 
       // Trigger 3-Way Match Check
       const matchResult = await MatchingEngine.validateThreeWayMatch(po_id);
 
       return ApiResponse.success(res, 'GRN submitted and stock ledger updated', { grn, matchResult }, 201);
     } catch (error) {
+      if (transaction && !transaction.finished) await transaction.rollback();
       next(error);
     }
   }
 
   // --- VENDOR INVOICE ENTRY ---
   static async createVendorInvoice(req, res, next) {
+    let transaction;
     try {
+      transaction = await sequelize.transaction();
       const { po_id, invoice_number, invoice_amount, invoice_date, items } = req.body;
-      const po = await PurchaseOrder.findByPk(po_id);
-      if (!po) return ApiResponse.error(res, 'Purchase Order not found', 404);
+      const po = await PurchaseOrder.findByPk(po_id, { transaction });
+      if (!po) {
+        await transaction.rollback();
+        return ApiResponse.error(res, 'Purchase Order not found', 404);
+      }
+      if (!['Sent', 'Partially Received', 'Fully Received', 'Discrepancy'].includes(po.status)) {
+        await transaction.rollback();
+        return ApiResponse.error(res, `Cannot log an invoice for a PO in '${po.status}' status`, 400);
+      }
 
       const fileUrl = req.file ? `/uploads/${req.file.filename}` : null;
+      let invoice;
+      if (po.status === 'Discrepancy') {
+        invoice = await VendorInvoice.findOne({
+          where: { po_id },
+          order: [['createdAt', 'DESC']],
+          transaction
+        });
+      }
 
-      const invoice = await VendorInvoice.create({
-        po_id,
-        invoice_number,
-        invoice_amount,
-        invoice_date,
-        file_url: fileUrl
-      });
+      if (invoice) {
+        await invoice.update({
+          invoice_number,
+          invoice_amount,
+          invoice_date,
+          file_url: fileUrl
+        }, { transaction });
+        await InvoiceItem.destroy({ where: { invoice_id: invoice.id }, transaction });
+      } else {
+        invoice = await VendorInvoice.create({
+          po_id,
+          invoice_number,
+          invoice_amount,
+          invoice_date,
+          file_url: fileUrl
+        }, { transaction });
+      }
 
       for (const item of items) {
         await InvoiceItem.create({
@@ -208,13 +284,44 @@ class PurchaseController {
           product_id: item.product_id,
           billed_qty: item.billed_qty,
           billed_unit_price: item.billed_unit_price
-        });
+        }, { transaction });
       }
+      await transaction.commit();
 
       // Trigger 3-Way Match Check
-      const matchResult = await MatchingEngine.validateThreeWayMatch(po_id);
+      const matchResult = await MatchingEngine.validateThreeWayMatch(po_id, req.user.id);
 
       return ApiResponse.success(res, 'Vendor invoice logged and 3-Way match evaluated', { invoice, matchResult }, 201);
+    } catch (error) {
+      if (transaction && !transaction.finished) await transaction.rollback();
+      next(error);
+    }
+  }
+
+  static async acceptReceivedQuantity(req, res, next) {
+    try {
+      const { po_id, remarks } = req.body;
+      const result = await MatchingEngine.acceptReceivedQuantity(po_id, req.user.id);
+
+      await AuditService.logAction({
+        userId: req.user.id,
+        action: 'ACCEPT_RECEIVED_QUANTITY',
+        tableName: 'purchase_orders',
+        recordId: po_id,
+        newValue: {
+          follow_up_po_id: result.followUpPO?.id || null,
+          manager_remarks: remarks,
+          matching_result: result.match.remarks
+        }
+      });
+
+      return ApiResponse.success(
+        res,
+        result.followUpPO
+          ? `Received quantity accepted; remaining quantity carried forward to ${result.followUpPO.po_number}`
+          : 'Received quantity accepted and 3-Way matching rerun',
+        result
+      );
     } catch (error) {
       next(error);
     }

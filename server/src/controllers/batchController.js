@@ -32,13 +32,7 @@ class BatchController {
       const product = await Product.findByPk(req.body.product_id);
       if (!product) return ApiResponse.error(res, 'Product not found', 404);
 
-      const today = new Date();
-      const expDate = new Date(req.body.expiry_date);
-      let expiry_status = 'Healthy';
-      const diffDays = Math.ceil((expDate - today) / (1000 * 60 * 60 * 24));
-      
-      if (diffDays <= 0) expiry_status = 'Expired';
-      else if (diffDays <= 30) expiry_status = 'Near Expiry';
+      const { status: expiry_status } = ExpiryEngine.classifyExpiry(req.body.expiry_date);
 
       const batch = await Batch.create({
         ...req.body,
