@@ -19,7 +19,7 @@ const grnSchema = Joi.object({
       product_id: Joi.number().integer().required(),
       batch_number: Joi.string().required(),
       mfg_date: Joi.date().optional().allow(null),
-      expiry_date: Joi.date().required(),
+      expiry_date: Joi.date().optional().allow(null),
       received_qty: Joi.number().integer().positive().required(),
       purchase_price: Joi.number().precision(2).positive().required(),
       selling_price: Joi.number().precision(2).positive().required()

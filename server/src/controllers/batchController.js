@@ -18,7 +18,10 @@ class BatchController {
           { model: Product, as: 'product' },
           { model: Supplier, as: 'supplier' }
         ],
-        order: [['expiry_date', 'ASC']]
+        order: [
+          [{ model: Product, as: 'product' }, 'name', 'ASC'],
+          ['expiry_date', 'ASC']
+        ]
       });
 
       return ApiResponse.success(res, 'Batches list fetched', batches);

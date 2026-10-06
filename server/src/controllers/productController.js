@@ -49,10 +49,22 @@ class ProductController {
       const todayStr = new Date().toISOString().split('T')[0];
       const productsWithStock = rows.map(p => {
         const productJson = p.toJSON();
-        const activeStock = (p.batches || [])
-          .filter(b => b.expiry_status !== 'Expired' && b.expiry_date >= todayStr)
+        const activeBatches = (p.batches || [])
+          .filter(b =>
+            Number(b.qty_remaining) > 0 &&
+            b.expiry_status !== 'Expired' &&
+            (!b.expiry_date || b.expiry_date >= todayStr)
+          )
+          .sort((a, b) => {
+            if (!a.expiry_date) return b.expiry_date ? 1 : 0;
+            if (!b.expiry_date) return -1;
+            return a.expiry_date.localeCompare(b.expiry_date);
+          });
+        const activeStock = activeBatches
           .reduce((sum, b) => sum + b.qty_remaining, 0);
         productJson.current_stock = activeStock;
+        productJson.next_expiry_date = activeBatches.find(b => b.expiry_date)?.expiry_date || null;
+        productJson.selling_price = activeBatches[0]?.selling_price || null;
         return productJson;
       });
 
@@ -89,19 +101,41 @@ class ProductController {
         await transaction.rollback();
         return ApiResponse.error(res, 'Store ID is required', 400);
       }
+      if (req.body.dummyjson_id) {
+        const existingSample = await Product.findOne({
+          where: { store_id: storeId, dummyjson_id: req.body.dummyjson_id },
+          transaction
+        });
+        if (existingSample) {
+          await transaction.rollback();
+          return ApiResponse.success(res, 'This sample product is already in the store catalog', existingSample);
+        }
+      }
 
       const {
         name,
+        dummyjson_id,
         category_id,
+        category_name,
         unit_of_measure_id,
         reorder_threshold,
         max_stock_level,
         initial_batch: initialBatch
       } = req.body;
+      let resolvedCategoryId = category_id;
+      if (!resolvedCategoryId && category_name) {
+        const [category] = await Category.findOrCreate({
+          where: { name: category_name },
+          defaults: { name: category_name },
+          transaction
+        });
+        resolvedCategoryId = category.id;
+      }
       const product = await Product.create({
         sku: `SKU-PENDING-${crypto.randomUUID()}`,
+        dummyjson_id: dummyjson_id || null,
         name,
-        category_id,
+        category_id: resolvedCategoryId,
         unit_of_measure_id: unit_of_measure_id || null,
         reorder_threshold,
         max_stock_level,

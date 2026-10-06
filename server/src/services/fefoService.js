@@ -30,9 +30,16 @@ class FefoService {
             product_id,
             qty_remaining: { [Op.gt]: 0 },
             expiry_status: { [Op.ne]: 'Expired' },
-            expiry_date: { [Op.gte]: todayStr }
+            [Op.or]: [
+              { expiry_date: { [Op.gte]: todayStr } },
+              { expiry_date: null }
+            ]
           },
-          order: [['expiry_date', 'ASC'], ['id', 'ASC']],
+          order: [
+            [sequelize.literal('CASE WHEN expiry_date IS NULL THEN 1 ELSE 0 END'), 'ASC'],
+            ['expiry_date', 'ASC'],
+            ['id', 'ASC']
+          ],
           transaction,
           lock: transaction.LOCK.UPDATE
         });

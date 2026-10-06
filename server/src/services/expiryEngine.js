@@ -4,6 +4,8 @@ const logger = require('../utils/logger');
 
 class ExpiryEngine {
   static classifyExpiry(expiryDate, referenceDate = new Date()) {
+    if (!expiryDate) return { diffDays: null, status: 'Healthy' };
+
     const expiryDay = new Date(expiryDate).toISOString().slice(0, 10);
     const todayDay = referenceDate.toISOString().slice(0, 10);
     const expiryUtc = Date.parse(`${expiryDay}T00:00:00Z`);
@@ -41,6 +43,14 @@ class ExpiryEngine {
     let nearExpiryCount = 0;
 
     for (const batch of batches) {
+      if (!batch.expiry_date) {
+        if (batch.expiry_status !== 'Healthy') {
+          batch.expiry_status = 'Healthy';
+          await batch.save();
+        }
+        continue;
+      }
+
       const { diffDays, status: newStatus } = this.classifyExpiry(batch.expiry_date, today);
 
       let oldStatus = batch.expiry_status;

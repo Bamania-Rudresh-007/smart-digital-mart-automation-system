@@ -182,8 +182,8 @@ class ReportController {
       });
 
       const reportRows = batches.map(b => {
-        const expDate = new Date(b.expiry_date);
-        const diffDays = Math.ceil((expDate - today) / (1000 * 60 * 60 * 24));
+        const expDate = b.expiry_date ? new Date(b.expiry_date) : null;
+        const diffDays = expDate ? Math.ceil((expDate - today) / (1000 * 60 * 60 * 24)) : null;
         const estimatedLoss = (parseFloat(b.purchase_price) * b.qty_remaining).toFixed(2);
         
         let recommendedDiscount = 0;
@@ -240,7 +240,7 @@ class ReportController {
 
       products.forEach(p => {
         const currentStock = p.batches
-          .filter(b => b.expiry_status !== 'Expired' && b.expiry_date >= todayStr)
+          .filter(b => b.expiry_status !== 'Expired' && (!b.expiry_date || b.expiry_date >= todayStr))
           .reduce((sum, b) => sum + b.qty_remaining, 0);
 
         if (currentStock <= p.reorder_threshold) {

@@ -78,8 +78,12 @@ const PurchaseOrdersList = () => {
       .map(item => ({
         product_id: item.product_id,
         product_name: item.product?.name,
+        product_category: item.product?.category?.name || '',
         batch_number: `B-${item.product?.sku || 'GRN'}-${Date.now().toString().slice(-4)}`,
-        expiry_date: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        has_expiry: /food|drink|beverage|grocery|beauty|skin|health|medicine|fragrance/i.test(
+          `${item.product?.category?.name || ''} ${item.product?.name || ''}`
+        ),
+        expiry_date: '',
         received_qty: item.remaining_qty,
         purchase_price: item.agreed_unit_price,
         selling_price: (parseFloat(item.agreed_unit_price) * 1.2).toFixed(2)
@@ -101,7 +105,11 @@ const PurchaseOrdersList = () => {
   const submitGRN = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/purchases/grn', { po_id: selectedPO.id, items: grnItems });
+      const items = grnItems.map(({ has_expiry, ...item }) => ({
+        ...item,
+        expiry_date: has_expiry ? item.expiry_date : null
+      }));
+      await api.post('/purchases/grn', { po_id: selectedPO.id, items });
       setIsGRNModal(false);
       fetchPOs();
     } catch (err) {
@@ -394,7 +402,7 @@ const PurchaseOrdersList = () => {
       {/* GRN Entry Modal */}
       <Modal isOpen={isGRNModal} onClose={() => setIsGRNModal(false)} title={`Receive GRN for ${selectedPO?.po_number}`}>
         <form onSubmit={submitGRN} className="space-y-4">
-          <p className="text-xs text-slate-500">Specify batch numbers, expiry dates, and received quantities for stock entry.</p>
+          <p className="text-xs text-slate-500">Record what arrived. Enter the label's expiry date for perishable batches; uncheck expiry for non-perishable items.</p>
           {grnItems.map((gi, idx) => (
             <div key={idx} className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl space-y-2">
               <p className="font-bold text-xs text-slate-900 dark:text-white">{gi.product_name}</p>
@@ -410,16 +418,32 @@ const PurchaseOrdersList = () => {
                   }}
                   className="px-2 py-1.5 bg-white dark:bg-slate-900 border rounded-lg text-xs"
                 />
-                <input
-                  type="date"
-                  value={gi.expiry_date}
-                  onChange={(e) => {
-                    const next = [...grnItems];
-                    next[idx].expiry_date = e.target.value;
-                    setGrnItems(next);
-                  }}
-                  className="px-2 py-1.5 bg-white dark:bg-slate-900 border rounded-lg text-xs"
-                />
+                <label className="col-span-2 flex items-center gap-2 text-[11px] text-slate-600 dark:text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={gi.has_expiry}
+                    onChange={(e) => {
+                      const next = [...grnItems];
+                      next[idx].has_expiry = e.target.checked;
+                      setGrnItems(next);
+                    }}
+                    className="h-4 w-4 accent-blue-600"
+                  />
+                  Expiry-tracked batch
+                </label>
+                {gi.has_expiry && (
+                  <input
+                    type="date"
+                    required
+                    value={gi.expiry_date}
+                    onChange={(e) => {
+                      const next = [...grnItems];
+                      next[idx].expiry_date = e.target.value;
+                      setGrnItems(next);
+                    }}
+                    className="col-span-2 px-2 py-1.5 bg-white dark:bg-slate-900 border rounded-lg text-xs"
+                  />
+                )}
               </div>
               <div className="grid grid-cols-3 gap-2">
                 <div>

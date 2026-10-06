@@ -59,14 +59,25 @@ describe('Expiry detection and automatic reorder workflows', () => {
       qty_remaining: 1,
       expiry_status: 'Healthy'
     });
+    const nonPerishableBatch = await Batch.create({
+      product_id: product.id,
+      batch_number: 'EXPIRY-TEST-NON-PERISHABLE',
+      expiry_date: null,
+      purchase_price: 10,
+      selling_price: 15,
+      qty_received: 3,
+      qty_remaining: 3,
+      expiry_status: 'Healthy'
+    });
 
     const result = await ExpiryEngine.scanBatchExpiries();
 
     await healthyStatus.reload();
     await nearExpiryBatch.reload();
-    expect(result.totalScanned).toBe(2);
+    expect(result.totalScanned).toBe(3);
     expect(healthyStatus.expiry_status).toBe('Expired');
     expect(nearExpiryBatch.expiry_status).toBe('Near Expiry');
+    expect(nonPerishableBatch.expiry_status).toBe('Healthy');
     expect(await Alert.count({ where: { store_id: store.id, type: 'expiry' } })).toBe(2);
   });
 
@@ -171,5 +182,58 @@ describe('Expiry detection and automatic reorder workflows', () => {
     expect(batch.expiry_date).toBe(body.initial_batch.expiry_date);
     expect(batch.qty_remaining).toBe(12);
     expect(await StockLedger.count({ where: { batch_id: batch.id, store_id: store.id } })).toBe(1);
+  });
+
+  test('sample products can create non-perishable stock without fake expiry dates', async () => {
+    const store = await Store.create({ name: 'Non-Perishable Store' });
+    const user = await User.create({
+      name: 'Non-Perishable Manager',
+      email: 'non-perishable-manager@sdmas.com',
+      password_hash: 'hash',
+      store_id: store.id,
+      status: 'active'
+    });
+    const category = await Category.create({ name: 'Electronics Test' });
+    const body = {
+      name: 'Sample Headphones',
+      category_name: 'Electronics',
+      dummyjson_id: 194,
+      reorder_threshold: 2,
+      max_stock_level: 20,
+      initial_batch: {
+        expiry_date: null,
+        purchase_price: 25,
+        selling_price: 40,
+        qty_received: 6
+      }
+    };
+    let response;
+    const res = {
+      status(statusCode) {
+        this.statusCode = statusCode;
+        return this;
+      },
+      json(payload) {
+        response = payload;
+        return payload;
+      }
+    };
+
+    await ProductController.createProduct({
+      body,
+      targetStoreId: null,
+      user: { id: user.id, store_id: store.id }
+    }, res, error => {
+      throw error;
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(response.data.dummyjson_id).toBe(194);
+    const createdCategory = await Category.findOne({ where: { name: 'Electronics' } });
+    expect(createdCategory).toBeTruthy();
+    expect(createdCategory.id).not.toBe(category.id);
+    const batch = await Batch.findOne({ where: { product_id: response.data.id } });
+    expect(batch.expiry_date).toBeNull();
+    expect(batch.expiry_status).toBe('Healthy');
   });
 });

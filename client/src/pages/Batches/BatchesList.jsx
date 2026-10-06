@@ -106,14 +106,15 @@ const BatchesList = () => {
                       <td className="p-4 font-mono font-bold text-slate-700 dark:text-slate-300">{b.batch_number}</td>
                       <td className="p-4 font-bold text-slate-900 dark:text-white">{b.product?.name || 'N/A'}</td>
                       <td className="p-4 text-slate-500">{b.mfg_date || 'N/A'}</td>
-                      <td className="p-4 font-bold text-slate-800 dark:text-slate-200">{b.expiry_date}</td>
+                      <td className="p-4 font-bold text-slate-800 dark:text-slate-200">{b.expiry_date || 'No expiry (non-perishable)'}</td>
                       <td className="p-4 text-slate-500">₹{parseFloat(b.purchase_price).toFixed(2)}</td>
                       <td className="p-4 font-bold text-emerald-600">₹{parseFloat(b.selling_price).toFixed(2)}</td>
                       <td className="p-4 font-extrabold text-slate-900 dark:text-white">{b.qty_remaining} / {b.qty_received}</td>
                       <td className="p-4">
                         {isExpired && <Badge variant="danger">EXPIRED (Write-Off)</Badge>}
                         {isNear && <Badge variant="warning">NEAR EXPIRY (Markdown Discount Suggested)</Badge>}
-                        {!isExpired && !isNear && <Badge variant="success">Healthy</Badge>}
+                        {!b.expiry_date && <Badge variant="info">No Expiry</Badge>}
+                        {b.expiry_date && !isExpired && !isNear && <Badge variant="success">Healthy</Badge>}
                       </td>
                     </tr>
                   );

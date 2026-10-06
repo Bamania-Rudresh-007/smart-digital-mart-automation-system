@@ -2,22 +2,24 @@ const Joi = require('joi');
 
 const productSchema = Joi.object({
   sku: Joi.string().optional().trim().allow(''),
+  dummyjson_id: Joi.number().integer().positive().optional().allow(null),
   name: Joi.string().required().trim(),
-  category_id: Joi.number().integer().required(),
+  category_id: Joi.number().integer().optional(),
+  category_name: Joi.string().trim().min(1).optional(),
   unit_of_measure_id: Joi.number().integer().optional().allow(null),
   reorder_threshold: Joi.number().integer().min(0).default(10),
   max_stock_level: Joi.number().integer().min(1).default(100),
   store_id: Joi.number().integer().optional(),
   initial_batch: Joi.object({
     batch_number: Joi.string().trim().allow(''),
-    mfg_date: Joi.date().max(Joi.ref('expiry_date')).optional().allow(null),
-    expiry_date: Joi.date().required(),
+    mfg_date: Joi.date().optional().allow(null),
+    expiry_date: Joi.date().optional().allow(null),
     purchase_price: Joi.number().precision(2).positive().required(),
     selling_price: Joi.number().precision(2).positive().required(),
     qty_received: Joi.number().integer().positive().required(),
     supplier_id: Joi.number().integer().optional().allow(null)
   }).optional().allow(null)
-});
+}).or('category_id', 'category_name');
 
 const categorySchema = Joi.object({
   name: Joi.string().required().trim(),
@@ -28,7 +30,7 @@ const batchSchema = Joi.object({
   product_id: Joi.number().integer().required(),
   batch_number: Joi.string().required().trim(),
   mfg_date: Joi.date().optional().allow(null),
-  expiry_date: Joi.date().required(),
+  expiry_date: Joi.date().optional().allow(null),
   purchase_price: Joi.number().precision(2).positive().required(),
   selling_price: Joi.number().precision(2).positive().required(),
   qty_received: Joi.number().integer().positive().required(),

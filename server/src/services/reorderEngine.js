@@ -41,7 +41,7 @@ class ReorderEngine {
     for (const product of products) {
       // Calculate current active non-expired stock
       const currentStock = product.batches
-        .filter(b => b.expiry_status !== 'Expired' && b.expiry_date >= todayStr)
+        .filter(b => b.expiry_status !== 'Expired' && (!b.expiry_date || b.expiry_date >= todayStr))
         .reduce((sum, b) => sum + b.qty_remaining, 0);
 
       if (currentStock <= product.reorder_threshold) {

@@ -71,4 +71,36 @@ describe('FEFO Sales Deduction Engine Unit Tests', () => {
     expect(updatedB1.qty_remaining).toBe(0);
     expect(updatedB2.qty_remaining).toBe(15);
   });
+
+  test('FEFO can sell non-perishable stock without an expiry date', async () => {
+    const store = await Store.create({ name: 'Non-Perishable Store' });
+    const user = await User.create({ name: 'Cashier', email: 'nonperishable@sdmas.com', password_hash: 'hash', store_id: store.id, status: 'active' });
+    const cat = await Category.create({ name: 'Non-Perishable Category' });
+    const product = await Product.create({
+      sku: 'SKU-FEFO-NONPERISHABLE',
+      name: 'Non-Perishable Item',
+      category_id: cat.id,
+      store_id: store.id
+    });
+    const batch = await Batch.create({
+      product_id: product.id,
+      batch_number: 'BATCH-NO-EXPIRY',
+      expiry_date: null,
+      purchase_price: 20,
+      selling_price: 30,
+      qty_received: 5,
+      qty_remaining: 5,
+      expiry_status: 'Healthy'
+    });
+
+    const result = await FefoService.processSale({
+      store_id: store.id,
+      cashier_id: user.id,
+      items: [{ product_id: product.id, qty: 2, unit_selling_price: 30 }]
+    });
+
+    await batch.reload();
+    expect(result.net_amount).toBe(60);
+    expect(batch.qty_remaining).toBe(3);
+  });
 });

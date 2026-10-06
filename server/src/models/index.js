@@ -64,6 +64,7 @@ const UnitOfMeasure = sequelize.define('UnitOfMeasure', {
 const Product = sequelize.define('Product', {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   sku: { type: DataTypes.STRING, allowNullable: false },
+  dummyjson_id: { type: DataTypes.INTEGER, allowNull: true },
   name: { type: DataTypes.STRING, allowNullable: false },
   category_id: { type: DataTypes.INTEGER, allowNullable: false },
   unit_of_measure_id: { type: DataTypes.INTEGER, allowNullable: true },
@@ -88,7 +89,7 @@ const Batch = sequelize.define('Batch', {
   product_id: { type: DataTypes.INTEGER, allowNullable: false },
   batch_number: { type: DataTypes.STRING, allowNullable: false },
   mfg_date: { type: DataTypes.DATEONLY },
-  expiry_date: { type: DataTypes.DATEONLY, allowNullable: false },
+  expiry_date: { type: DataTypes.DATEONLY, allowNull: true, defaultValue: null },
   purchase_price: { type: DataTypes.DECIMAL(12, 2), allowNullable: false },
   selling_price: { type: DataTypes.DECIMAL(12, 2), allowNullable: false },
   qty_received: { type: DataTypes.INTEGER, allowNullable: false },

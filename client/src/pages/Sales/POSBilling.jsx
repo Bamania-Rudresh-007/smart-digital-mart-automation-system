@@ -50,10 +50,11 @@ const POSBilling = () => {
       updated[existingIndex].qty += 1;
       setCart(updated);
     } else {
-      // Find default selling price from active batch or estimate
-      const defaultPrice = product.batches && product.batches.length > 0 
-        ? parseFloat(product.batches[0].selling_price) 
-        : 100.00;
+      const defaultPrice = Number(product.selling_price);
+      if (!Number.isFinite(defaultPrice) || defaultPrice <= 0) {
+        alert(`Set a valid selling price on an active batch for "${product.name}" before billing it.`);
+        return;
+      }
 
       setCart([
         ...cart,
@@ -151,7 +152,7 @@ const POSBilling = () => {
         <div className="flex-1 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 gap-3 pr-1">
           {products.map((p) => {
             const outOfStock = p.current_stock <= 0;
-            const price = p.batches && p.batches.length > 0 ? parseFloat(p.batches[0].selling_price) : 100.00;
+            const price = Number(p.selling_price);
 
             return (
               <button
@@ -167,9 +168,14 @@ const POSBilling = () => {
                 <div>
                   <span className="text-[10px] font-mono text-slate-400 block">{p.sku}</span>
                   <h4 className="font-bold text-xs text-slate-900 dark:text-white line-clamp-2 mt-0.5">{p.name}</h4>
+                  {p.next_expiry_date && (
+                    <span className="mt-1 block text-[10px] text-amber-700 dark:text-amber-400">
+                      Next batch expires {p.next_expiry_date}
+                    </span>
+                  )}
                 </div>
                 <div className="mt-3 flex items-center justify-between">
-                  <span className="text-sm font-extrabold text-blue-600">₹{price.toFixed(2)}</span>
+                  <span className="text-sm font-extrabold text-blue-600">{Number.isFinite(price) ? `₹${price.toFixed(2)}` : 'Price required'}</span>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${outOfStock ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-800'}`}>
                     {outOfStock ? 'Out of Stock' : `${p.current_stock} left`}
                   </span>

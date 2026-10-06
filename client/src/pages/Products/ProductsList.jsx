@@ -12,6 +12,7 @@ const EMPTY_FORM = {
   reorder_threshold: 10,
   max_stock_level: 100,
   add_initial_batch: false,
+  has_expiry: true,
   batch_number: '',
   mfg_date: '',
   expiry_date: '',
@@ -36,6 +37,9 @@ const ProductsList = () => {
   const [search, setSearch] = useState('');
   const [selectedCat, setSelectedCat] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [sampleImport, setSampleImport] = useState(null);
+  const [sampleExistingProduct, setSampleExistingProduct] = useState(null);
+  const [sampleCategoryName, setSampleCategoryName] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState(EMPTY_FORM);
@@ -46,7 +50,6 @@ const ProductsList = () => {
   const [sampleSearchInput, setSampleSearchInput] = useState('');
   const [sampleLoading, setSampleLoading] = useState(false);
   const [sampleError, setSampleError] = useState('');
-  const [importingId, setImportingId] = useState(null);
 
   useEffect(() => {
     fetchProducts();
@@ -121,27 +124,52 @@ const ProductsList = () => {
     e.preventDefault();
     setSaving(true);
     try {
-      const payload = {
-        name: formData.name.trim(),
-        category_id: Number(formData.category_id),
-        unit_of_measure_id: formData.unit_of_measure_id ? Number(formData.unit_of_measure_id) : null,
-        reorder_threshold: Number(formData.reorder_threshold),
-        max_stock_level: Number(formData.max_stock_level),
-        store_id: user?.store?.id
-      };
-      if (formData.add_initial_batch) {
-        payload.initial_batch = {
-          batch_number: formData.batch_number.trim(),
+      if (sampleExistingProduct) {
+        const batchNumber = formData.batch_number.trim() ||
+          `B-${sampleExistingProduct.sku}-${Date.now().toString(36).toUpperCase()}`;
+        await api.post('/batches', {
+          product_id: sampleExistingProduct.id,
+          batch_number: batchNumber,
           mfg_date: formData.mfg_date || null,
-          expiry_date: formData.expiry_date,
+          expiry_date: formData.has_expiry ? formData.expiry_date : null,
           purchase_price: Number(formData.purchase_price),
           selling_price: Number(formData.selling_price),
           qty_received: Number(formData.qty_received),
           supplier_id: formData.supplier_id ? Number(formData.supplier_id) : null
+        });
+      } else {
+        const payload = {
+          name: formData.name.trim(),
+          dummyjson_id: sampleImport?.id,
+          unit_of_measure_id: formData.unit_of_measure_id ? Number(formData.unit_of_measure_id) : null,
+          reorder_threshold: Number(formData.reorder_threshold),
+          max_stock_level: Number(formData.max_stock_level),
+          store_id: user?.store?.id
         };
+        if (formData.category_id) {
+          payload.category_id = Number(formData.category_id);
+        } else if (sampleCategoryName) {
+          payload.category_name = sampleCategoryName;
+        } else {
+          throw new Error('Select a product category.');
+        }
+        if (formData.add_initial_batch) {
+          payload.initial_batch = {
+            batch_number: formData.batch_number.trim(),
+            mfg_date: formData.mfg_date || null,
+            expiry_date: formData.has_expiry ? formData.expiry_date : null,
+            purchase_price: Number(formData.purchase_price),
+            selling_price: Number(formData.selling_price),
+            qty_received: Number(formData.qty_received),
+            supplier_id: formData.supplier_id ? Number(formData.supplier_id) : null
+          };
+        }
+        await api.post('/products', payload);
       }
-      await api.post('/products', payload);
       setIsModalOpen(false);
+      setSampleImport(null);
+      setSampleExistingProduct(null);
+      setSampleCategoryName('');
       setFormData(EMPTY_FORM);
       await fetchProducts();
     } catch (err) {
@@ -152,30 +180,32 @@ const ProductsList = () => {
   };
 
   const addSampleToInventory = async (sample) => {
-    setImportingId(sample.id);
-    try {
-      const categoryName = toCategoryName(sample.category || 'Other');
-      let category = categories.find(item => item.name.toLowerCase() === categoryName.toLowerCase());
-      if (!category) {
-        const response = await api.post('/products/meta/categories', { name: categoryName });
-        category = response.data.data;
-        setCategories(current => [...current, category]);
-      }
+    const categoryName = toCategoryName(sample.category || 'Other');
+    const category = categories.find(item => item.name.toLowerCase() === categoryName.toLowerCase());
+    const existingProduct = products.find(product =>
+      product.dummyjson_id === sample.id ||
+      product.name.toLowerCase() === sample.title.toLowerCase()
+    );
+    const expiryTracked = /food|drink|beverage|grocery|beauty|skin|health|medicine|fragrance/i.test(
+      `${sample.category || ''} ${sample.title || ''}`
+    );
 
-      await api.post('/products', {
-        name: sample.title,
-        category_id: category.id,
-        reorder_threshold: 10,
-        max_stock_level: 100,
-        store_id: user?.store?.id
-      });
-      await fetchProducts();
-      alert(`${sample.title} was added to your product catalog. Add a batch to record actual store stock.`);
-    } catch (error) {
-      alert(error.response?.data?.message || error.message || 'Unable to add this sample product.');
-    } finally {
-      setImportingId(null);
-    }
+    setSampleImport(sample);
+    setSampleExistingProduct(existingProduct || null);
+    setSampleCategoryName(category || existingProduct ? '' : categoryName);
+    setFormData({
+      ...EMPTY_FORM,
+      name: sample.title,
+      category_id: existingProduct
+        ? String(existingProduct.category_id)
+        : category ? String(category.id) : '',
+      add_initial_batch: true,
+      has_expiry: expiryTracked,
+      selling_price: '',
+      reorder_threshold: 10,
+      max_stock_level: 100
+    });
+    setIsModalOpen(true);
   };
 
   return (
@@ -254,10 +284,25 @@ const ProductsList = () => {
                     <p className="line-clamp-2 min-h-8 text-[11px] text-slate-500">{sample.description}</p>
                     <button
                       onClick={() => addSampleToInventory(sample)}
-                      disabled={importingId === sample.id}
+                      disabled={products.some(product =>
+                        (product.dummyjson_id === sample.id ||
+                          product.name.toLowerCase() === sample.title.toLowerCase()) &&
+                        Number(product.current_stock) > 0
+                      )}
                       className="w-full rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white hover:bg-blue-500 disabled:opacity-60"
                     >
-                      {importingId === sample.id ? 'Adding…' : 'Add to my catalog'}
+                      {products.some(product =>
+                        (product.dummyjson_id === sample.id ||
+                          product.name.toLowerCase() === sample.title.toLowerCase()) &&
+                        Number(product.current_stock) > 0
+                      )
+                        ? 'Already stocked'
+                        : products.some(product =>
+                          product.dummyjson_id === sample.id ||
+                          product.name.toLowerCase() === sample.title.toLowerCase()
+                        )
+                          ? 'Add stock & expiry'
+                          : 'Set stock & add'}
                     </button>
                   </div>
                 </article>
@@ -356,10 +401,23 @@ const ProductsList = () => {
       </div>
 
       {/* Modal */}
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add Product to Store">
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          setSampleImport(null);
+          setSampleExistingProduct(null);
+          setSampleCategoryName('');
+        }}
+        title={sampleImport ? 'Add Sample to Store Inventory' : 'Add Product to Store'}
+      >
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs text-blue-800">
-            Product ID and SKU are generated automatically when you save. Record each delivery as a batch so its quantity and expiry date can be tracked separately.
+            {sampleImport
+              ? sampleExistingProduct
+                ? 'This product is already in your catalog but has no active stock. Add a real batch below so it becomes available in POS and batch/expiry tracking.'
+                : 'This sample becomes a real store item only after you enter your local stock and pricing. DummyJSON demo prices are in USD and are not copied into your store prices.'
+              : 'Product ID and SKU are generated automatically when you save. Record each delivery as a batch so its quantity and expiry date can be tracked separately.'}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -377,6 +435,7 @@ const ProductsList = () => {
                 type="text"
                 required
                 value={formData.name}
+                readOnly={Boolean(sampleImport)}
                 onChange={(e) => updateForm('name', e.target.value)}
                 placeholder="e.g. Whole milk, 1 litre"
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"
@@ -388,12 +447,18 @@ const ProductsList = () => {
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">Category</label>
               <select
-                required
-                value={formData.category_id}
-                onChange={(e) => updateForm('category_id', e.target.value)}
+                required={!sampleCategoryName}
+                value={formData.category_id || (sampleCategoryName ? '__sample_category__' : '')}
+                onChange={(e) => updateForm(
+                  'category_id',
+                  e.target.value === '__sample_category__' ? '' : e.target.value
+                )}
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"
               >
                 <option value="">Select Category</option>
+                {sampleCategoryName && (
+                  <option value="__sample_category__">Create “{sampleCategoryName}” category</option>
+                )}
                 {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
@@ -433,25 +498,27 @@ const ProductsList = () => {
             </div>
           </div>
 
-          <label className="flex items-start gap-3 rounded-xl border border-slate-200 dark:border-slate-700 p-3">
-            <input
-              type="checkbox"
-              checked={formData.add_initial_batch}
-              onChange={event => updateForm('add_initial_batch', event.target.checked)}
-              className="mt-0.5 h-4 w-4 accent-blue-600"
-            />
-            <span>
-              <span className="block text-xs font-bold text-slate-800 dark:text-white">Add opening batch and stock</span>
-              <span className="block mt-1 text-[11px] text-slate-500">Use this for food, beverages, cosmetics, or other dated goods. Every batch has its own expiry date.</span>
-            </span>
-          </label>
+          {!sampleImport && (
+            <label className="flex items-start gap-3 rounded-xl border border-slate-200 dark:border-slate-700 p-3">
+              <input
+                type="checkbox"
+                checked={formData.add_initial_batch}
+                onChange={event => updateForm('add_initial_batch', event.target.checked)}
+                className="mt-0.5 h-4 w-4 accent-blue-600"
+              />
+              <span>
+                <span className="block text-xs font-bold text-slate-800 dark:text-white">Add opening batch and stock</span>
+                <span className="block mt-1 text-[11px] text-slate-500">Food, beverages, cosmetics, and other dated goods can be expiry-tracked per batch.</span>
+              </span>
+            </label>
+          )}
 
           {formData.add_initial_batch && (
             <div className="space-y-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 p-4">
               <div className="flex items-center gap-2 text-xs font-bold text-slate-800 dark:text-white">
                 <Clock3 className="h-4 w-4 text-blue-600" /> Opening batch details
               </div>
-              <p className="text-[11px] text-slate-500">Batch number is generated if left blank. Enter the label's expiry date for perishable products.</p>
+              <p className="text-[11px] text-slate-500">Batch number is generated if left blank. Enter local costs and available stock; the sample's USD price is not store inventory data.</p>
               <div className="grid grid-cols-2 gap-3">
                 <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
                   Batch / lot number (optional)
@@ -461,10 +528,28 @@ const ProductsList = () => {
                   Manufacturing date
                   <input type="date" value={formData.mfg_date} onChange={event => updateForm('mfg_date', event.target.value)} className="mt-1 w-full rounded-lg border bg-white px-3 py-2 dark:bg-slate-900" />
                 </label>
-                <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
-                  Expiry / best-before date *
-                  <input type="date" required value={formData.expiry_date} onChange={event => updateForm('expiry_date', event.target.value)} className="mt-1 w-full rounded-lg border bg-white px-3 py-2 dark:bg-slate-900" />
-                </label>
+                <div className="col-span-2">
+                  <label className="flex items-center gap-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={formData.has_expiry}
+                      onChange={event => updateForm('has_expiry', event.target.checked)}
+                      className="h-4 w-4 accent-blue-600"
+                    />
+                    This batch has an expiry / best-before date
+                  </label>
+                  {formData.has_expiry ? (
+                    <input
+                      type="date"
+                      required
+                      value={formData.expiry_date}
+                      onChange={event => updateForm('expiry_date', event.target.value)}
+                      className="mt-2 w-full rounded-lg border bg-white px-3 py-2 text-xs dark:bg-slate-900"
+                    />
+                  ) : (
+                    <p className="mt-1 text-[11px] text-slate-500">This non-perishable batch will be included in stock and POS but excluded from expiry alerts.</p>
+                  )}
+                </div>
                 <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
                   Opening quantity *
                   <input type="number" min="1" required value={formData.qty_received} onChange={event => updateForm('qty_received', event.target.value)} className="mt-1 w-full rounded-lg border bg-white px-3 py-2 dark:bg-slate-900" placeholder="e.g. 24" />
