@@ -64,7 +64,6 @@ const UnitOfMeasure = sequelize.define('UnitOfMeasure', {
 const Product = sequelize.define('Product', {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   sku: { type: DataTypes.STRING, allowNullable: false },
-  dummyjson_id: { type: DataTypes.INTEGER, allowNull: true },
   name: { type: DataTypes.STRING, allowNullable: false },
   category_id: { type: DataTypes.INTEGER, allowNullable: false },
   unit_of_measure_id: { type: DataTypes.INTEGER, allowNullable: true },
