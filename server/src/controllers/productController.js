@@ -101,41 +101,18 @@ class ProductController {
         await transaction.rollback();
         return ApiResponse.error(res, 'Store ID is required', 400);
       }
-      if (req.body.dummyjson_id) {
-        const existingSample = await Product.findOne({
-          where: { store_id: storeId, dummyjson_id: req.body.dummyjson_id },
-          transaction
-        });
-        if (existingSample) {
-          await transaction.rollback();
-          return ApiResponse.success(res, 'This sample product is already in the store catalog', existingSample);
-        }
-      }
-
       const {
         name,
-        dummyjson_id,
         category_id,
-        category_name,
         unit_of_measure_id,
         reorder_threshold,
         max_stock_level,
         initial_batch: initialBatch
       } = req.body;
-      let resolvedCategoryId = category_id;
-      if (!resolvedCategoryId && category_name) {
-        const [category] = await Category.findOrCreate({
-          where: { name: category_name },
-          defaults: { name: category_name },
-          transaction
-        });
-        resolvedCategoryId = category.id;
-      }
       const product = await Product.create({
         sku: `SKU-PENDING-${crypto.randomUUID()}`,
-        dummyjson_id: dummyjson_id || null,
         name,
-        category_id: resolvedCategoryId,
+        category_id,
         unit_of_measure_id: unit_of_measure_id || null,
         reorder_threshold,
         max_stock_level,
@@ -255,15 +232,6 @@ class ProductController {
         ]
       });
       return ApiResponse.success(res, 'Categories list', categories);
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  static async createCategory(req, res, next) {
-    try {
-      const category = await Category.create(req.body);
-      return ApiResponse.success(res, 'Category created', category, 201);
     } catch (error) {
       next(error);
     }
