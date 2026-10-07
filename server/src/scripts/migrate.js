@@ -1,4 +1,3 @@
-const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
 const logger = require('../utils/logger');
 require('../models');
@@ -10,11 +9,8 @@ async function migrate() {
 
     const queryInterface = sequelize.getQueryInterface();
     const productColumns = await queryInterface.describeTable('products');
-    if (!productColumns.dummyjson_id) {
-      await queryInterface.addColumn('products', 'dummyjson_id', {
-        type: DataTypes.INTEGER,
-        allowNull: true
-      });
+    if (productColumns.dummyjson_id) {
+      await queryInterface.removeColumn('products', 'dummyjson_id');
     }
 
     logger.info('Database migration completed successfully!');
