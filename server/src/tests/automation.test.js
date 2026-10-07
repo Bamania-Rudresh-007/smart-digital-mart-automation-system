@@ -184,7 +184,7 @@ describe('Expiry detection and automatic reorder workflows', () => {
     expect(await StockLedger.count({ where: { batch_id: batch.id, store_id: store.id } })).toBe(1);
   });
 
-  test('sample products can create non-perishable stock without fake expiry dates', async () => {
+  test('products can create non-perishable stock without fake expiry dates', async () => {
     const store = await Store.create({ name: 'Non-Perishable Store' });
     const user = await User.create({
       name: 'Non-Perishable Manager',
@@ -195,9 +195,8 @@ describe('Expiry detection and automatic reorder workflows', () => {
     });
     const category = await Category.create({ name: 'Electronics Test' });
     const body = {
-      name: 'Sample Headphones',
-      category_name: 'Electronics',
-      dummyjson_id: 194,
+      name: 'Store Headphones',
+      category_id: category.id,
       reorder_threshold: 2,
       max_stock_level: 20,
       initial_batch: {
@@ -228,10 +227,8 @@ describe('Expiry detection and automatic reorder workflows', () => {
     });
 
     expect(res.statusCode).toBe(201);
-    expect(response.data.dummyjson_id).toBe(194);
-    const createdCategory = await Category.findOne({ where: { name: 'Electronics' } });
-    expect(createdCategory).toBeTruthy();
-    expect(createdCategory.id).not.toBe(category.id);
+    expect(response.data.name).toBe('Store Headphones');
+    expect(response.data.category_id).toBe(category.id);
     const batch = await Batch.findOne({ where: { product_id: response.data.id } });
     expect(batch.expiry_date).toBeNull();
     expect(batch.expiry_status).toBe('Healthy');
