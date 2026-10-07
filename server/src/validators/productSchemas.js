@@ -2,10 +2,8 @@ const Joi = require('joi');
 
 const productSchema = Joi.object({
   sku: Joi.string().optional().trim().allow(''),
-  dummyjson_id: Joi.number().integer().positive().optional().allow(null),
   name: Joi.string().required().trim(),
-  category_id: Joi.number().integer().optional(),
-  category_name: Joi.string().trim().min(1).optional(),
+  category_id: Joi.number().integer().required(),
   unit_of_measure_id: Joi.number().integer().optional().allow(null),
   reorder_threshold: Joi.number().integer().min(0).default(10),
   max_stock_level: Joi.number().integer().min(1).default(100),
@@ -19,11 +17,6 @@ const productSchema = Joi.object({
     qty_received: Joi.number().integer().positive().required(),
     supplier_id: Joi.number().integer().optional().allow(null)
   }).optional().allow(null)
-}).or('category_id', 'category_name');
-
-const categorySchema = Joi.object({
-  name: Joi.string().required().trim(),
-  parent_category_id: Joi.number().integer().optional().allow(null)
 });
 
 const batchSchema = Joi.object({
@@ -47,7 +40,6 @@ const supplierSchema = Joi.object({
 
 module.exports = {
   productSchema,
-  categorySchema,
   batchSchema,
   supplierSchema
 };
