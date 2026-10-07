@@ -118,6 +118,8 @@ async function seedDatabase() {
     const subFlour = await Category.create({ name: 'Atta & Flours', parent_category_id: catGroceries.id });
     const subSoaps = await Category.create({ name: 'Soaps & Wash', parent_category_id: catPersonal.id });
     const subTea = await Category.create({ name: 'Tea & Coffee', parent_category_id: catBeverages.id });
+    const subSnacks = await Category.create({ name: 'Snacks & Biscuits', parent_category_id: catBeverages.id });
+    const subCleaning = await Category.create({ name: 'Laundry & Cleaning', parent_category_id: catPersonal.id });
 
     // 6. Seed Suppliers
     logger.info('Seeding Suppliers...');
@@ -191,6 +193,66 @@ async function seedDatabase() {
         store_id: mainStore.id,
         batches: [
           { batch_number: 'B-TEA-102', days_to_expiry: 200, purchase_price: 260.00, selling_price: 330.00, qty: 30, supplier_id: supplierTata.id }
+        ]
+      },
+      {
+        sku: 'SKU-BUTTER-001',
+        name: 'Amul Salted Butter 500g',
+        category_id: subMilk.id,
+        unit_of_measure_id: uomMap['Pk'],
+        reorder_threshold: 12,
+        max_stock_level: 50,
+        store_id: mainStore.id,
+        batches: [
+          { batch_number: 'B-BUTTER-241', days_to_expiry: 75, purchase_price: 245.00, selling_price: 285.00, qty: 24, supplier_id: supplierAmul.id }
+        ]
+      },
+      {
+        sku: 'SKU-OIL-001',
+        name: 'Fortune Sunlite Sunflower Oil 1L',
+        category_id: catGroceries.id,
+        unit_of_measure_id: uomMap['L'],
+        reorder_threshold: 20,
+        max_stock_level: 80,
+        store_id: mainStore.id,
+        batches: [
+          { batch_number: 'B-OIL-518', days_to_expiry: 250, purchase_price: 108.00, selling_price: 125.00, qty: 35, supplier_id: supplierFortune.id }
+        ]
+      },
+      {
+        sku: 'SKU-SALT-001',
+        name: 'Tata Salt Iodized 1kg',
+        category_id: catGroceries.id,
+        unit_of_measure_id: uomMap['Kg'],
+        reorder_threshold: 20,
+        max_stock_level: 120,
+        store_id: mainStore.id,
+        batches: [
+          { batch_number: 'B-SALT-334', days_to_expiry: 300, purchase_price: 18.00, selling_price: 24.00, qty: 70, supplier_id: supplierTata.id }
+        ]
+      },
+      {
+        sku: 'SKU-BISCUIT-001',
+        name: 'Parle-G Gluco Biscuits 800g',
+        category_id: subSnacks.id,
+        unit_of_measure_id: uomMap['Pk'],
+        reorder_threshold: 15,
+        max_stock_level: 80,
+        store_id: mainStore.id,
+        batches: [
+          { batch_number: 'B-PARLE-782', days_to_expiry: 140, purchase_price: 70.00, selling_price: 90.00, qty: 45, supplier_id: supplierTata.id }
+        ]
+      },
+      {
+        sku: 'SKU-DETERGENT-001',
+        name: 'Surf Excel Easy Wash Detergent 1kg',
+        category_id: subCleaning.id,
+        unit_of_measure_id: uomMap['Pk'],
+        reorder_threshold: 10,
+        max_stock_level: 60,
+        store_id: mainStore.id,
+        batches: [
+          { batch_number: 'B-SURF-129', days_to_expiry: 365, purchase_price: 122.00, selling_price: 145.00, qty: 28, supplier_id: supplierHUL.id }
         ]
       }
     ];
