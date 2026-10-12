@@ -18,7 +18,7 @@ class AuditController {
         limit,
         offset,
         include: [{ model: User, as: 'user', attributes: ['id', 'name', 'email'] }],
-        order: [['timestamp', 'DESC']]
+        order: [['createdAt', 'DESC']]
       });
 
       return ApiResponse.paginated(res, 'Audit logs', rows, page, limit, count);
