@@ -1,11 +1,11 @@
-import socketIo from 'socket.io';
+import { Server } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import logger from '../utils/logger.js';
 
 let io = null;
 
 const initSocket = (server) => {
-  io = socketIo(server, {
+  io = new Server(server, {
     cors: {
       origin: process.env.CLIENT_URL || '*',
       methods: ['GET', 'POST']

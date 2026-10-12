@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import { pathToFileURL } from 'node:url';
 import { sequelize, Store, Role, Permission, User } from '../models/index.js';
 import logger from '../utils/logger.js';
 
@@ -82,7 +83,7 @@ async function provisionSuperAdmin() {
   }
 }
 
-if (require.main === module) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   provisionSuperAdmin().catch(error => {
     logger.error(`Unable to provision Super Admin account: ${error.message}`);
     console.error(error);

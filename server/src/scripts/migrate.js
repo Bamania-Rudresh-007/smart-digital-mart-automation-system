@@ -1,3 +1,4 @@
+import { pathToFileURL } from 'node:url';
 import sequelize from '../config/database.js';
 import logger from '../utils/logger.js';
 import '../models/index.js';
@@ -21,7 +22,7 @@ async function migrate() {
   }
 }
 
-if (require.main === module) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   migrate().then(() => process.exit(0));
 }
 

@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import { pathToFileURL } from 'node:url';
 import { 
   sequelize, Store, Role, Permission, User, Category, UnitOfMeasure, 
   Product, Supplier, Batch, PurchaseOrder, POItem, StockLedger, AlertRule 
@@ -334,7 +335,7 @@ async function seedDatabase() {
   }
 }
 
-if (require.main === module) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   seedDatabase()
     .then(() => process.exit(0))
     .catch(() => process.exit(1));
