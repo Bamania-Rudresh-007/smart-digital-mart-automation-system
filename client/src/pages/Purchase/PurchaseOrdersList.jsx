@@ -336,64 +336,97 @@ const PurchaseOrdersList = () => {
 
       {/* Create PO Modal */}
       <Modal isOpen={isCreateModal} onClose={() => setIsCreateModal(false)} title="Create Purchase Order">
-        <form onSubmit={handleCreatePO} className="space-y-4">
-          <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">Select Supplier</label>
+        <form onSubmit={handleCreatePO} className="space-y-5">
+          <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+            <label htmlFor="po-supplier" className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">
+              Supplier <span className="text-rose-500">*</span>
+            </label>
             <select
+              id="po-supplier"
               required
               value={poForm.supplier_id}
               onChange={(e) => setPoForm({ ...poForm, supplier_id: e.target.value })}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800"
             >
-              <option value="">Select Supplier</option>
+              <option value="">Choose a supplier</option>
               {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
+            <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+              Select the supplier this order will be sent to.
+            </p>
           </div>
 
-          <div className="space-y-2">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">PO Line Items</label>
+          <div className="space-y-3">
+            <div>
+              <h4 className="text-sm font-bold text-slate-900 dark:text-white">Order items</h4>
+              <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                Choose a product, then enter the quantity and unit price agreed with the supplier.
+              </p>
+            </div>
             {poForm.items.map((item, idx) => (
-              <div key={idx} className="grid grid-cols-3 gap-2">
-                <select
-                  required
-                  value={item.product_id}
-                  onChange={(e) => {
-                    const newItems = [...poForm.items];
-                    newItems[idx].product_id = e.target.value;
-                    setPoForm({ ...poForm, items: newItems });
-                  }}
-                  className="px-2 py-2 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs"
-                >
-                  <option value="">Select Product</option>
-                  {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-                <input
-                  type="number"
-                  placeholder="Ordered Qty"
-                  value={item.ordered_qty}
-                  onChange={(e) => {
-                    const newItems = [...poForm.items];
-                    newItems[idx].ordered_qty = parseInt(e.target.value, 10);
-                    setPoForm({ ...poForm, items: newItems });
-                  }}
-                  className="px-2 py-2 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs"
-                />
-                <input
-                  type="number"
-                  placeholder="Agreed Unit Price"
-                  value={item.agreed_unit_price}
-                  onChange={(e) => {
-                    const newItems = [...poForm.items];
-                    newItems[idx].agreed_unit_price = parseFloat(e.target.value);
-                    setPoForm({ ...poForm, items: newItems });
-                  }}
-                  className="px-2 py-2 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs"
-                />
+              <div key={idx} className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 p-4 dark:border-slate-700 sm:grid-cols-3">
+                <div className="sm:col-span-3">
+                  <label htmlFor={`po-product-${idx}`} className="mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Product <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    id={`po-product-${idx}`}
+                    required
+                    value={item.product_id}
+                    onChange={(e) => {
+                      const newItems = [...poForm.items];
+                      newItems[idx].product_id = e.target.value;
+                      setPoForm({ ...poForm, items: newItems });
+                    }}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800"
+                  >
+                    <option value="">Choose a product</option>
+                    {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor={`po-quantity-${idx}`} className="mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Order quantity <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    id={`po-quantity-${idx}`}
+                    type="number"
+                    min="1"
+                    step="1"
+                    required
+                    value={item.ordered_qty}
+                    onChange={(e) => {
+                      const newItems = [...poForm.items];
+                      newItems[idx].ordered_qty = parseInt(e.target.value, 10);
+                      setPoForm({ ...poForm, items: newItems });
+                    }}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label htmlFor={`po-unit-price-${idx}`} className="mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Agreed unit price (₹) <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    id={`po-unit-price-${idx}`}
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    required
+                    value={item.agreed_unit_price}
+                    onChange={(e) => {
+                      const newItems = [...poForm.items];
+                      newItems[idx].agreed_unit_price = parseFloat(e.target.value);
+                      setPoForm({ ...poForm, items: newItems });
+                    }}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800"
+                  />
+                </div>
               </div>
             ))}
           </div>
 
-          <button type="submit" className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl text-xs">
+          <button type="submit" className="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white transition-colors hover:bg-blue-500">
             Create Draft PO
           </button>
         </form>
