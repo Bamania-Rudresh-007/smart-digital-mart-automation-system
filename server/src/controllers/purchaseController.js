@@ -51,7 +51,7 @@ class PurchaseController {
 
   static async createPO(req, res, next) {
     try {
-      const storeId = req.targetStoreId || req.body.store_id;
+      const storeId = req.targetStoreId || req.body.store_id || req.user.store_id;
       if (!storeId) return ApiResponse.error(res, 'Store ID is required', 400);
 
       const poNumber = `PO-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
