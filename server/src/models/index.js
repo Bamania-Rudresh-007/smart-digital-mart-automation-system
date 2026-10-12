@@ -456,6 +456,8 @@ const AuditLog = sequelize.define(
 // User <-> Store
 User.belongsTo(Store, { foreignKey: "store_id", as: "store" });
 Store.hasMany(User, { foreignKey: "store_id", as: "users" });
+User.hasMany(AuditLog, { foreignKey: "user_id", as: "auditLogs" });
+AuditLog.belongsTo(User, { foreignKey: "user_id", as: "user" });
 
 // User <-> Role (Many to Many)
 User.belongsToMany(Role, {
