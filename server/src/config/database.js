@@ -3,7 +3,7 @@ import { Sequelize } from 'sequelize';
 import logger from '../utils/logger.js';
 import 'dotenv/config';
 
-const dialect = process.env.DB_DIALECT || 'sqlite';
+const dialect = process.env.DB_DIALECT || 'mysql';
 const isSqlite = dialect === 'sqlite';
 
 if (!['mysql', 'sqlite'].includes(dialect)) {
