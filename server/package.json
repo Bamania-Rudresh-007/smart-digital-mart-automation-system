@@ -31,7 +31,6 @@
     "pdfkit-table": "^0.1.99",
     "sequelize": "^6.37.3",
     "socket.io": "^4.7.5",
-    "sqlite3": "^6.0.1",
     "swagger-ui-express": "^5.0.0",
     "winston": "^3.13.0"
   },
