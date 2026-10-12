@@ -15,8 +15,35 @@ async function seedDatabase() {
     }
 
     logger.info('Syncing database...');
-    await sequelize.sync({ force: true });
+    await sequelize.sync();
     logger.info('Database synced successfully.');
+
+    const seededModels = [
+      ['stores', Store],
+      ['roles', Role],
+      ['permissions', Permission],
+      ['users', User],
+      ['categories', Category],
+      ['units of measure', UnitOfMeasure],
+      ['products', Product],
+      ['suppliers', Supplier],
+      ['batches', Batch],
+      ['purchase orders', PurchaseOrder],
+      ['purchase order items', POItem],
+      ['stock ledger', StockLedger],
+      ['alert rules', AlertRule]
+    ];
+    const populatedModels = (await Promise.all(
+      seededModels.map(async ([name, Model]) => [name, await Model.count()])
+    ))
+      .filter(([, count]) => count > 0)
+      .map(([name]) => name);
+
+    if (populatedModels.length > 0) {
+      throw new Error(
+        `Refusing to seed demo data because these tables already contain records: ${populatedModels.join(', ')}.`
+      );
+    }
 
     // 1. Seed Stores
     logger.info('Seeding Stores...');
@@ -61,9 +88,48 @@ async function seedDatabase() {
       }
     }
 
-    // Assign all permissions to Super Admin & Store Manager
+    // Super Admin and Store Manager have full access; other roles retain role-specific writes.
     await createdRoles['Super Admin'].addPermissions(permissions);
     await createdRoles['Store Manager'].addPermissions(permissions);
+
+    const roleGrants = {
+      'Inventory Staff': {
+        Products: ['read', 'create', 'update'],
+        Batches: ['read', 'create', 'update'],
+        PurchaseOrders: ['read'],
+        GRN: ['create'],
+        Reports: ['read']
+      },
+      'Procurement Officer': {
+        Products: ['read'],
+        Batches: ['read'],
+        PurchaseOrders: ['read', 'create', 'update'],
+        GRN: ['create'],
+        VendorInvoices: ['create'],
+        Reports: ['read']
+      },
+      Cashier: {
+        Products: ['read'],
+        Batches: ['read'],
+        Sales: ['read', 'create'],
+        Reports: ['read']
+      },
+      Auditor: {
+        Products: ['read'],
+        Batches: ['read'],
+        PurchaseOrders: ['read'],
+        Sales: ['read'],
+        Reports: ['read'],
+        AuditLogs: ['read']
+      }
+    };
+
+    for (const [roleName, grants] of Object.entries(roleGrants)) {
+      const rolePermissions = permissions.filter(permission =>
+        grants[permission.module]?.includes(permission.action)
+      );
+      await createdRoles[roleName].addPermissions(rolePermissions);
+    }
 
     // 3. Seed Users
     logger.info('Seeding Users...');
