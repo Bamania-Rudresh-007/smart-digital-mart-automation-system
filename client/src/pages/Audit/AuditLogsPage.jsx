@@ -52,7 +52,7 @@ const AuditLogsPage = () => {
               ) : (
                 logs.map(log => (
                   <tr key={log.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                    <td className="p-4 font-mono text-slate-500">{new Date(log.timestamp).toLocaleString()}</td>
+                    <td className="p-4 font-mono text-slate-500">{new Date(log.createdAt).toLocaleString()}</td>
                     <td className="p-4 font-bold text-blue-600">{log.action}</td>
                     <td className="p-4 font-medium text-slate-900 dark:text-white">{log.user?.name || `User #${log.user_id}`}</td>
                     <td className="p-4 font-mono text-slate-700 dark:text-slate-300">{log.table_name}</td>
