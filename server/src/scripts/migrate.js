@@ -1,6 +1,6 @@
-const sequelize = require('../config/database');
-const logger = require('../utils/logger');
-require('../models');
+import sequelize from '../config/database.js';
+import logger from '../utils/logger.js';
+import '../models/index.js';
 
 async function migrate() {
   try {
@@ -25,4 +25,4 @@ if (require.main === module) {
   migrate().then(() => process.exit(0));
 }
 
-module.exports = migrate;
+export default migrate;

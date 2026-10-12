@@ -1,5 +1,5 @@
-const { AuditLog } = require('../models');
-const logger = require('../utils/logger');
+import { AuditLog } from '../models/index.js';
+import logger from '../utils/logger.js';
 
 class AuditService {
   static async logAction({ userId, action, tableName, recordId, oldValue = null, newValue = null }) {
@@ -18,4 +18,4 @@ class AuditService {
   }
 }
 
-module.exports = AuditService;
+export default AuditService;

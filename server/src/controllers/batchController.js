@@ -1,8 +1,8 @@
-const { Batch, Product, Supplier, StockLedger } = require('../models');
-const ApiResponse = require('../utils/apiResponse');
-const AuditService = require('../services/auditService');
-const ExpiryEngine = require('../services/expiryEngine');
-const { Op } = require('sequelize');
+import { Batch, Product, Supplier, StockLedger } from '../models/index.js';
+import ApiResponse from '../utils/apiResponse.js';
+import AuditService from '../services/auditService.js';
+import ExpiryEngine from '../services/expiryEngine.js';
+import { Op } from 'sequelize';
 
 class BatchController {
   static async getBatches(req, res, next) {
@@ -79,4 +79,4 @@ class BatchController {
   }
 }
 
-module.exports = BatchController;
+export default BatchController;

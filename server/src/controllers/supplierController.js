@@ -1,6 +1,6 @@
-const { Supplier } = require('../models');
-const ApiResponse = require('../utils/apiResponse');
-const AuditService = require('../services/auditService');
+import { Supplier } from '../models/index.js';
+import ApiResponse from '../utils/apiResponse.js';
+import AuditService from '../services/auditService.js';
 
 class SupplierController {
   static async getSuppliers(req, res, next) {
@@ -29,4 +29,4 @@ class SupplierController {
   }
 }
 
-module.exports = SupplierController;
+export default SupplierController;

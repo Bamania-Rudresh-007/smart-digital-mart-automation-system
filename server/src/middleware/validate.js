@@ -1,4 +1,4 @@
-const ApiResponse = require('../utils/apiResponse');
+import ApiResponse from '../utils/apiResponse.js';
 
 const validate = (schema, property = 'body') => {
   return (req, res, next) => {
@@ -11,4 +11,4 @@ const validate = (schema, property = 'body') => {
   };
 };
 
-module.exports = validate;
+export default validate;

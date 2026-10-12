@@ -1,15 +1,17 @@
-const express = require('express');
+import { fileURLToPath } from 'node:url';
+import express from 'express';
+import multer from 'multer';
+import path from 'path';
+import PurchaseController from '../controllers/purchaseController.js';
+import { authenticate } from '../middleware/auth.js';
+import { requirePermission, enforceStoreScope } from '../middleware/rbac.js';
+import validate from '../middleware/validate.js';
+import { poSchema, grnSchema, vendorInvoiceSchema, overrideSchema, quantityResolutionSchema } from '../validators/purchaseSchemas.js';
+
 const router = express.Router();
-const multer = require('multer');
-const path = require('path');
-const PurchaseController = require('../controllers/purchaseController');
-const { authenticate } = require('../middleware/auth');
-const { requirePermission, enforceStoreScope } = require('../middleware/rbac');
-const validate = require('../middleware/validate');
-const { poSchema, grnSchema, vendorInvoiceSchema, overrideSchema, quantityResolutionSchema } = require('../validators/purchaseSchemas');
 
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, path.resolve(__dirname, '../../uploads')),
+  destination: (req, file, cb) => cb(null, path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../uploads')),
   filename: (req, file, cb) => cb(null, `invoice-${Date.now()}${path.extname(file.originalname)}`)
 });
 const upload = multer({ storage });
@@ -27,4 +29,4 @@ router.post('/invoice', requirePermission('VendorInvoices', 'create'), upload.si
 router.post('/accept-received-quantity', requirePermission('PurchaseOrders', 'approve'), validate(quantityResolutionSchema), PurchaseController.acceptReceivedQuantity);
 router.post('/override', requirePermission('PurchaseOrders', 'approve'), validate(overrideSchema), PurchaseController.overrideDiscrepancy);
 
-module.exports = router;
+export default router;

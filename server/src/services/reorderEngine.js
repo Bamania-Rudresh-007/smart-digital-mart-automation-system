@@ -1,7 +1,7 @@
-const { Op } = require('sequelize');
-const { sequelize, Product, Batch, PurchaseOrder, POItem, Supplier, Alert, User, Role } = require('../models');
-const { broadcastAlert } = require('../sockets/socketManager');
-const logger = require('../utils/logger');
+import { Op } from 'sequelize';
+import { sequelize, Product, Batch, PurchaseOrder, POItem, Supplier, Alert, User, Role } from '../models/index.js';
+import { broadcastAlert } from '../sockets/socketManager.js';
+import logger from '../utils/logger.js';
 
 class ReorderEngine {
   /**
@@ -132,4 +132,4 @@ class ReorderEngine {
   }
 }
 
-module.exports = ReorderEngine;
+export default ReorderEngine;

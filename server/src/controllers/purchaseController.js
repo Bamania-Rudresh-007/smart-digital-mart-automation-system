@@ -1,8 +1,8 @@
-const { sequelize, PurchaseOrder, POItem, GoodsReceipt, GRNItem, VendorInvoice, InvoiceItem, PurchaseMatch, Supplier, Product, Batch, StockLedger, User } = require('../models');
-const ApiResponse = require('../utils/apiResponse');
-const MatchingEngine = require('../services/matchingEngine');
-const ExpiryEngine = require('../services/expiryEngine');
-const AuditService = require('../services/auditService');
+import { sequelize, PurchaseOrder, POItem, GoodsReceipt, GRNItem, VendorInvoice, InvoiceItem, PurchaseMatch, Supplier, Product, Batch, StockLedger, User } from '../models/index.js';
+import ApiResponse from '../utils/apiResponse.js';
+import MatchingEngine from '../services/matchingEngine.js';
+import ExpiryEngine from '../services/expiryEngine.js';
+import AuditService from '../services/auditService.js';
 
 class PurchaseController {
   // --- PURCHASE ORDERS ---
@@ -348,4 +348,4 @@ class PurchaseController {
   }
 }
 
-module.exports = PurchaseController;
+export default PurchaseController;

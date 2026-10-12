@@ -1,4 +1,4 @@
-const Joi = require('joi');
+import Joi from 'joi';
 
 const productSchema = Joi.object({
   sku: Joi.string().optional().trim().allow(''),
@@ -38,7 +38,7 @@ const supplierSchema = Joi.object({
   gst_no: Joi.string().optional().allow('', null)
 });
 
-module.exports = {
+export {
   productSchema,
   batchSchema,
   supplierSchema

@@ -15,19 +15,28 @@ class ApiResponse {
     });
   }
 
-  static paginated(res, message, data, page, limit, total, statusCode = 200) {
+  static paginated(res, message, data, page = 1, limit = 50, total = 0, statusCode = 200) {
+    const parsedPage = Number.parseInt(page, 10);
+    const parsedLimit = Number.parseInt(limit, 10);
+    const parsedTotal = Number.parseInt(total, 10);
+
+    const safePage = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+    const safeLimit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 50;
+    const safeTotal = Number.isFinite(parsedTotal) && parsedTotal >= 0 ? parsedTotal : 0;
+    const totalPages = safeTotal === 0 ? 0 : Math.ceil(safeTotal / safeLimit);
+
     return res.status(statusCode).json({
       success: true,
       message,
       data,
       pagination: {
-        page: parseInt(page, 10),
-        limit: parseInt(limit, 10),
-        total: parseInt(total, 10),
-        totalPages: Math.ceil(total / limit)
+        page: safePage,
+        limit: safeLimit,
+        total: safeTotal,
+        totalPages
       }
     });
   }
 }
 
-module.exports = ApiResponse;
+export default ApiResponse;

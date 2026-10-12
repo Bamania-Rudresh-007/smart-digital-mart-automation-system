@@ -1,9 +1,9 @@
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
-const { User, Role, Store, RefreshToken, PasswordReset, sequelize } = require('../models');
-const NotificationService = require('./notificationService');
-const AuditService = require('./auditService');
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
+import { User, Role, Store, RefreshToken, PasswordReset, sequelize } from '../models/index.js';
+import NotificationService from './notificationService.js';
+import AuditService from './auditService.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_sdmas_access_token_key_2026';
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'super_secret_sdmas_refresh_token_key_2026';
@@ -236,4 +236,4 @@ class AuthService {
   }
 }
 
-module.exports = AuthService;
+export default AuthService;

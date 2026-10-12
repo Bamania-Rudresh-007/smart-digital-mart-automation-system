@@ -2,11 +2,12 @@
   "name": "sdmas-server",
   "version": "1.0.0",
   "description": "Smart Digital Mart Automation System - Backend API",
+  "type": "module",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "jest --runInBand --detectOpenHandles",
+    "test": "node --experimental-vm-modules -e \"process.env.DB_NAME = process.env.DB_TEST_NAME || 'sdmas_test'; import('./node_modules/jest/bin/jest.js')\" -- --runInBand --detectOpenHandles",
     "db:migrate": "node src/scripts/migrate.js",
     "db:seed": "node src/scripts/seed.js",
     "db:admin": "node src/scripts/provisionSuperAdmin.js"
@@ -30,7 +31,6 @@
     "pdfkit-table": "^0.1.99",
     "sequelize": "^6.37.3",
     "socket.io": "^4.7.5",
-    "sqlite3": "^5.1.7",
     "swagger-ui-express": "^5.0.0",
     "winston": "^3.13.0"
   },

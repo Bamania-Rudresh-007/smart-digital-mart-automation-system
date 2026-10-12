@@ -1,9 +1,21 @@
-const crypto = require('crypto');
-const { sequelize, Product, Category, UnitOfMeasure, Store, Batch, StockLedger } = require('../models');
-const ApiResponse = require('../utils/apiResponse');
-const AuditService = require('../services/auditService');
-const ExpiryEngine = require('../services/expiryEngine');
-const { Op } = require('sequelize');
+import crypto from 'crypto';
+import {
+  sequelize,
+  Product,
+  Category,
+  UnitOfMeasure,
+  Store,
+  Batch,
+  StockLedger,
+  POItem,
+  GRNItem,
+  InvoiceItem,
+  SaleItem
+} from '../models/index.js';
+import ApiResponse from '../utils/apiResponse.js';
+import AuditService from '../services/auditService.js';
+import ExpiryEngine from '../services/expiryEngine.js';
+import { Op } from 'sequelize';
 
 class ProductController {
   // --- PRODUCTS ---
@@ -61,7 +73,7 @@ class ProductController {
             return a.expiry_date.localeCompare(b.expiry_date);
           });
         const activeStock = activeBatches
-          .reduce((sum, b) => sum + b.qty_remaining, 0);
+          .reduce((sum, b) => sum + Number(b.qty_remaining), 0);
         productJson.current_stock = activeStock;
         productJson.next_expiry_date = activeBatches.find(b => b.expiry_date)?.expiry_date || null;
         productJson.selling_price = activeBatches[0]?.selling_price || null;
@@ -201,12 +213,36 @@ class ProductController {
   }
 
   static async deleteProduct(req, res, next) {
+    let transaction;
     try {
-      const product = await Product.findByPk(req.params.id);
-      if (!product) return ApiResponse.error(res, 'Product not found', 404);
+      transaction = await sequelize.transaction();
+      const product = await Product.findByPk(req.params.id, { transaction });
+      if (!product) {
+        await transaction.rollback();
+        return ApiResponse.error(res, 'Product not found', 404);
+      }
+
+      for (const model of [POItem, GRNItem, InvoiceItem, SaleItem]) {
+        const reference = await model.findOne({
+          where: { product_id: product.id },
+          attributes: ['id'],
+          transaction
+        });
+        if (reference) {
+          await transaction.rollback();
+          return ApiResponse.error(
+            res,
+            'Cannot delete this product because it is referenced by purchase, receipt, invoice, or sales records. It must be retained to preserve transaction history.',
+            409
+          );
+        }
+      }
 
       const oldVal = product.toJSON();
-      await product.destroy();
+      await StockLedger.destroy({ where: { product_id: product.id }, transaction });
+      await Batch.destroy({ where: { product_id: product.id }, transaction });
+      await product.destroy({ transaction });
+      await transaction.commit();
 
       await AuditService.logAction({
         userId: req.user.id,
@@ -218,6 +254,7 @@ class ProductController {
 
       return ApiResponse.success(res, 'Product deleted successfully');
     } catch (error) {
+      if (transaction && !transaction.finished) await transaction.rollback();
       next(error);
     }
   }
@@ -258,4 +295,4 @@ class ProductController {
   }
 }
 
-module.exports = ProductController;
+export default ProductController;

@@ -1,6 +1,6 @@
-const { Batch, Product, Alert } = require('../models');
-const { broadcastAlert } = require('../sockets/socketManager');
-const logger = require('../utils/logger');
+import { Batch, Product, Alert } from '../models/index.js';
+import { broadcastAlert } from '../sockets/socketManager.js';
+import logger from '../utils/logger.js';
 
 class ExpiryEngine {
   static classifyExpiry(expiryDate, referenceDate = new Date()) {
@@ -95,4 +95,4 @@ class ExpiryEngine {
   }
 }
 
-module.exports = ExpiryEngine;
+export default ExpiryEngine;

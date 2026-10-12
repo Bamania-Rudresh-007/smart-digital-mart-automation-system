@@ -1,7 +1,7 @@
-const cron = require('node-cron');
-const ExpiryEngine = require('../services/expiryEngine');
-const ReorderEngine = require('../services/reorderEngine');
-const logger = require('../utils/logger');
+import cron from 'node-cron';
+import ExpiryEngine from '../services/expiryEngine.js';
+import ReorderEngine from '../services/reorderEngine.js';
+import logger from '../utils/logger.js';
 
 const initScheduler = () => {
   logger.info('Initializing Node-Cron background jobs...');
@@ -28,4 +28,4 @@ const initScheduler = () => {
   });
 };
 
-module.exports = { initScheduler };
+export { initScheduler };

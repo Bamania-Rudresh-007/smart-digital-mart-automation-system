@@ -1,5 +1,5 @@
-const ExcelJS = require('exceljs');
-const PDFDocument = require('pdfkit-table');
+import ExcelJS from 'exceljs';
+import PDFDocument from 'pdfkit-table';
 
 class ExportUtils {
   static async exportToExcel(res, filename, columns, data) {
@@ -58,4 +58,4 @@ class ExportUtils {
   }
 }
 
-module.exports = ExportUtils;
+export default ExportUtils;

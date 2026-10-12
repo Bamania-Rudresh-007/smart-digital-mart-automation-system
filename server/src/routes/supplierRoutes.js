@@ -1,14 +1,14 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const SupplierController = require('../controllers/supplierController');
-const { authenticate } = require('../middleware/auth');
-const { requirePermission } = require('../middleware/rbac');
-const validate = require('../middleware/validate');
-const { supplierSchema } = require('../validators/productSchemas');
+import SupplierController from '../controllers/supplierController.js';
+import { authenticate } from '../middleware/auth.js';
+import { requirePermission } from '../middleware/rbac.js';
+import validate from '../middleware/validate.js';
+import { supplierSchema } from '../validators/productSchemas.js';
 
 router.use(authenticate);
 
 router.get('/', requirePermission('PurchaseOrders', 'read'), SupplierController.getSuppliers);
 router.post('/', requirePermission('PurchaseOrders', 'create'), validate(supplierSchema), SupplierController.createSupplier);
 
-module.exports = router;
+export default router;

@@ -1,8 +1,8 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const AlertController = require('../controllers/alertController');
-const { authenticate } = require('../middleware/auth');
-const { enforceStoreScope } = require('../middleware/rbac');
+import AlertController from '../controllers/alertController.js';
+import { authenticate } from '../middleware/auth.js';
+import { enforceStoreScope } from '../middleware/rbac.js';
 
 router.use(authenticate);
 router.use(enforceStoreScope);
@@ -16,4 +16,4 @@ router.put('/notifications/:id/read', AlertController.markNotificationRead);
 router.get('/rules', AlertController.getAlertRules);
 router.post('/rules', AlertController.saveAlertRule);
 
-module.exports = router;
+export default router;

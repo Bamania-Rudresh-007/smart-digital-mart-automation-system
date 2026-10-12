@@ -1,13 +1,13 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const AuthController = require('../controllers/authController');
-const { authenticate } = require('../middleware/auth');
-const validate = require('../middleware/validate');
-const { 
+import AuthController from '../controllers/authController.js';
+import { authenticate } from '../middleware/auth.js';
+import validate from '../middleware/validate.js';
+import { 
   registerSchema, loginSchema, forgotPasswordSchema, 
   resetPasswordSchema, refreshTokenSchema 
-} = require('../validators/authSchemas');
-const rateLimit = require('express-rate-limit');
+} from '../validators/authSchemas.js';
+import rateLimit from 'express-rate-limit';
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -24,4 +24,4 @@ router.post('/reset-password', validate(resetPasswordSchema), AuthController.res
 router.get('/profile', authenticate, AuthController.getProfile);
 router.put('/profile', authenticate, AuthController.updateProfile);
 
-module.exports = router;
+export default router;

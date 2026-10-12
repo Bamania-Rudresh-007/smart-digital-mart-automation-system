@@ -1,4 +1,4 @@
-const {
+import {
   sequelize,
   PurchaseOrder,
   POItem,
@@ -8,9 +8,9 @@ const {
   InvoiceItem,
   PurchaseMatch,
   Alert
-} = require('../models');
-const { broadcastAlert } = require('../sockets/socketManager');
-const logger = require('../utils/logger');
+} from '../models/index.js';
+import { broadcastAlert } from '../sockets/socketManager.js';
+import logger from '../utils/logger.js';
 
 const percentDifference = (actual, expected) => {
   if (expected === 0) return actual === 0 ? 0 : Infinity;
@@ -320,4 +320,4 @@ class MatchingEngine {
   }
 }
 
-module.exports = MatchingEngine;
+export default MatchingEngine;

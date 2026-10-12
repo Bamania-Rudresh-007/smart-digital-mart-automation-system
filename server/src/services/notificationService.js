@@ -1,6 +1,6 @@
-const nodemailer = require('nodemailer');
-const { Notification } = require('../models');
-const logger = require('../utils/logger');
+import nodemailer from 'nodemailer';
+import { Notification } from '../models/index.js';
+import logger from '../utils/logger.js';
 
 class NotificationService {
   static getTransporter() {
@@ -40,7 +40,7 @@ class NotificationService {
   static async sendSMS({ phone, message }) {
     if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
       try {
-        const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+        const client = (await import('twilio')).default(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
         await client.messages.create({
           body: message,
           from: process.env.TWILIO_PHONE_NUMBER,
@@ -72,4 +72,4 @@ class NotificationService {
   }
 }
 
-module.exports = NotificationService;
+export default NotificationService;

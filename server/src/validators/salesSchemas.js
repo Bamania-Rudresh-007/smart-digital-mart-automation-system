@@ -1,4 +1,4 @@
-const Joi = require('joi');
+import Joi from 'joi';
 
 const checkoutSchema = Joi.object({
   store_id: Joi.number().integer().optional(),
@@ -14,4 +14,4 @@ const checkoutSchema = Joi.object({
   ).min(1).required()
 });
 
-module.exports = { checkoutSchema };
+export { checkoutSchema };

@@ -1,6 +1,6 @@
-const socketIo = require('socket.io');
-const jwt = require('jsonwebtoken');
-const logger = require('../utils/logger');
+import socketIo from 'socket.io';
+import jwt from 'jsonwebtoken';
+import logger from '../utils/logger.js';
 
 let io = null;
 
@@ -63,7 +63,7 @@ const broadcastAlert = (storeId, alertData) => {
   }
 };
 
-module.exports = {
+export {
   initSocket,
   getIO,
   broadcastStockUpdate,

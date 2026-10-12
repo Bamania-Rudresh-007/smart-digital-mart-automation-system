@@ -1,8 +1,8 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const UserController = require('../controllers/userController');
-const { authenticate } = require('../middleware/auth');
-const { requirePermission, enforceStoreScope } = require('../middleware/rbac');
+import UserController from '../controllers/userController.js';
+import { authenticate } from '../middleware/auth.js';
+import { requirePermission, enforceStoreScope } from '../middleware/rbac.js';
 
 router.use(authenticate);
 router.use(enforceStoreScope);
@@ -15,4 +15,4 @@ router.get('/meta/roles', requirePermission('UserManagement', 'read'), UserContr
 router.get('/meta/permissions', requirePermission('UserManagement', 'read'), UserController.getPermissions);
 router.post('/meta/roles', requirePermission('UserManagement', 'create'), UserController.createRole);
 
-module.exports = router;
+export default router;

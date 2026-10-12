@@ -1,6 +1,6 @@
-const jwt = require('jsonwebtoken');
-const { User, Role, Permission, Store } = require('../models');
-const ApiResponse = require('../utils/apiResponse');
+import jwt from 'jsonwebtoken';
+import { User, Role, Permission, Store } from '../models/index.js';
+import ApiResponse from '../utils/apiResponse.js';
 
 const authenticate = async (req, res, next) => {
   try {
@@ -41,4 +41,4 @@ const authenticate = async (req, res, next) => {
   }
 };
 
-module.exports = { authenticate };
+export { authenticate };

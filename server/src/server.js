@@ -1,18 +1,19 @@
-const http = require('http');
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const morgan = require('morgan');
-const path = require('path');
-require('dotenv').config();
+import { fileURLToPath } from 'node:url';
+import http from 'http';
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import morgan from 'morgan';
+import path from 'path';
+import 'dotenv/config';
 
-const { sequelize } = require('./models');
-const routes = require('./routes');
-const errorHandler = require('./middleware/errorHandler');
-const { initSocket } = require('./sockets/socketManager');
-const { initScheduler } = require('./jobs/scheduler');
-const setupSwagger = require('./config/swagger');
-const logger = require('./utils/logger');
+import { sequelize } from './models/index.js';
+import routes from './routes/index.js';
+import errorHandler from './middleware/errorHandler.js';
+import { initSocket } from './sockets/socketManager.js';
+import { initScheduler } from './jobs/scheduler.js';
+import setupSwagger from './config/swagger.js';
+import logger from './utils/logger.js';
 
 const app = express();
 const server = http.createServer(app);
@@ -28,7 +29,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
 
 // Static Uploads Folder
-app.use('/uploads', express.static(path.resolve(__dirname, '../uploads')));
+app.use('/uploads', express.static(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../uploads')));
 
 // Swagger API Docs
 setupSwagger(app);
@@ -76,4 +77,4 @@ if (process.env.NODE_ENV !== 'test') {
   startServer();
 }
 
-module.exports = { app, server };
+export { app, server };

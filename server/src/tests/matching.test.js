@@ -1,9 +1,8 @@
-const MatchingEngine = require('../services/matchingEngine');
-const { sequelize, Store, User, Supplier, Product, Category, PurchaseOrder, POItem, GoodsReceipt, GRNItem, VendorInvoice, InvoiceItem } = require('../models');
+import MatchingEngine from '../services/matchingEngine.js';
+import { sequelize, Store, User, Supplier, Product, Category, PurchaseOrder, POItem, GoodsReceipt, GRNItem, VendorInvoice, InvoiceItem } from '../models/index.js';
 
 describe('3-Way Matching Engine Unit Tests', () => {
   beforeAll(async () => {
-    process.env.DB_DIALECT = 'sqlite';
     await sequelize.sync({ force: true });
   });
 

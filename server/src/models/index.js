@@ -1,5 +1,5 @@
-const { DataTypes } = require('sequelize');
-const sequelize = require('../config/database');
+import { DataTypes } from 'sequelize';
+import sequelize from '../config/database.js';
 
 // Store
 const Store = sequelize.define('Store', {
@@ -338,7 +338,7 @@ StockLedger.belongsTo(Store, { foreignKey: 'store_id', as: 'store' });
 // Refresh Token
 RefreshToken.belongsTo(User, { foreignKey: 'user_id' });
 
-module.exports = {
+export {
   sequelize,
   Store,
   Role,

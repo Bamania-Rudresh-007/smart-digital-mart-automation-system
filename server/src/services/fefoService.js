@@ -1,8 +1,8 @@
-const { Op } = require('sequelize');
-const { sequelize, Batch, Product, Sale, SaleItem, StockLedger } = require('../models');
-const { broadcastStockUpdate } = require('../sockets/socketManager');
-const ReorderEngine = require('./reorderEngine');
-const logger = require('../utils/logger');
+import { Op } from 'sequelize';
+import { sequelize, Batch, Product, Sale, SaleItem, StockLedger } from '../models/index.js';
+import { broadcastStockUpdate } from '../sockets/socketManager.js';
+import ReorderEngine from './reorderEngine.js';
+import logger from '../utils/logger.js';
 
 class FefoService {
   /**
@@ -147,4 +147,4 @@ class FefoService {
   }
 }
 
-module.exports = FefoService;
+export default FefoService;

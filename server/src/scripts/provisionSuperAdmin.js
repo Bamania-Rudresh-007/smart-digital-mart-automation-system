@@ -1,6 +1,6 @@
-const bcrypt = require('bcryptjs');
-const { sequelize, Store, Role, Permission, User } = require('../models');
-const logger = require('../utils/logger');
+import bcrypt from 'bcryptjs';
+import { sequelize, Store, Role, Permission, User } from '../models/index.js';
+import logger from '../utils/logger.js';
 
 const modules = [
   'Products',
@@ -90,4 +90,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = provisionSuperAdmin;
+export default provisionSuperAdmin;

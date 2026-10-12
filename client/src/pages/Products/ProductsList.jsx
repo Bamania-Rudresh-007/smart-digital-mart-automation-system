@@ -393,7 +393,7 @@ const ProductsList = () => {
           <p className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs text-blue-800">
             {editingProduct
               ? 'Update the product details below. Existing batch and stock records remain unchanged.'
-              : 'The product SKU is assigned automatically. Add an opening batch now or record stock later.'}
+              : 'Active stock comes from unexpired batches. To start with stock, tick “Add opening batch and stock” and enter its opening quantity; otherwise this product starts at 0.'}
           </p>
           {editingProduct && (
             <div>

@@ -1,10 +1,10 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const ProductController = require('../controllers/productController');
-const { authenticate } = require('../middleware/auth');
-const { requirePermission, enforceStoreScope } = require('../middleware/rbac');
-const validate = require('../middleware/validate');
-const { productSchema } = require('../validators/productSchemas');
+import ProductController from '../controllers/productController.js';
+import { authenticate } from '../middleware/auth.js';
+import { requirePermission, enforceStoreScope } from '../middleware/rbac.js';
+import validate from '../middleware/validate.js';
+import { productSchema } from '../validators/productSchemas.js';
 
 router.use(authenticate);
 router.use(enforceStoreScope);
@@ -19,4 +19,4 @@ router.post('/', requirePermission('Products', 'create'), validate(productSchema
 router.put('/:id', requirePermission('Products', 'update'), validate(productSchema), ProductController.updateProduct);
 router.delete('/:id', requirePermission('Products', 'delete'), ProductController.deleteProduct);
 
-module.exports = router;
+export default router;

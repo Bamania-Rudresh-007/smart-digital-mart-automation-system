@@ -1,4 +1,4 @@
-const Joi = require('joi');
+import Joi from 'joi';
 
 const poSchema = Joi.object({
   supplier_id: Joi.number().integer().required(),
@@ -51,7 +51,7 @@ const quantityResolutionSchema = Joi.object({
   remarks: Joi.string().required().min(5)
 });
 
-module.exports = {
+export {
   poSchema,
   grnSchema,
   vendorInvoiceSchema,

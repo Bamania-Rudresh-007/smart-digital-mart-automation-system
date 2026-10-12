@@ -1,9 +1,8 @@
-const FefoService = require('../services/fefoService');
-const { sequelize, Store, User, Role, Product, Batch, Category } = require('../models');
+import FefoService from '../services/fefoService.js';
+import { sequelize, Store, User, Role, Product, Batch, Category } from '../models/index.js';
 
 describe('FEFO Sales Deduction Engine Unit Tests', () => {
   beforeAll(async () => {
-    process.env.DB_DIALECT = 'sqlite';
     await sequelize.sync({ force: true });
   });
 

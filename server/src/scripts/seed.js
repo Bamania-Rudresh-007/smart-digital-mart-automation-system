@@ -1,9 +1,9 @@
-const bcrypt = require('bcryptjs');
-const { 
+import bcrypt from 'bcryptjs';
+import { 
   sequelize, Store, Role, Permission, User, Category, UnitOfMeasure, 
   Product, Supplier, Batch, PurchaseOrder, POItem, StockLedger, AlertRule 
-} = require('../models');
-const logger = require('../utils/logger');
+} from '../models/index.js';
+import logger from '../utils/logger.js';
 
 async function seedDatabase() {
   try {
@@ -340,4 +340,4 @@ if (require.main === module) {
     .catch(() => process.exit(1));
 }
 
-module.exports = seedDatabase;
+export default seedDatabase;

@@ -1,16 +1,16 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
 
-const authRoutes = require('./authRoutes');
-const productRoutes = require('./productRoutes');
-const batchRoutes = require('./batchRoutes');
-const supplierRoutes = require('./supplierRoutes');
-const purchaseRoutes = require('./purchaseRoutes');
-const salesRoutes = require('./salesRoutes');
-const alertRoutes = require('./alertRoutes');
-const reportRoutes = require('./reportRoutes');
-const userRoutes = require('./userRoutes');
-const auditRoutes = require('./auditRoutes');
+import authRoutes from './authRoutes.js';
+import productRoutes from './productRoutes.js';
+import batchRoutes from './batchRoutes.js';
+import supplierRoutes from './supplierRoutes.js';
+import purchaseRoutes from './purchaseRoutes.js';
+import salesRoutes from './salesRoutes.js';
+import alertRoutes from './alertRoutes.js';
+import reportRoutes from './reportRoutes.js';
+import userRoutes from './userRoutes.js';
+import auditRoutes from './auditRoutes.js';
 
 router.use('/auth', authRoutes);
 router.use('/products', productRoutes);
@@ -23,4 +23,4 @@ router.use('/reports', reportRoutes);
 router.use('/users', userRoutes);
 router.use('/audits', auditRoutes);
 
-module.exports = router;
+export default router;

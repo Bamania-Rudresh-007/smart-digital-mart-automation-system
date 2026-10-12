@@ -1,5 +1,5 @@
-const { AuditLog, User } = require('../models');
-const ApiResponse = require('../utils/apiResponse');
+import { AuditLog, User } from '../models/index.js';
+import ApiResponse from '../utils/apiResponse.js';
 
 class AuditController {
   static async getAuditLogs(req, res, next) {
@@ -28,4 +28,4 @@ class AuditController {
   }
 }
 
-module.exports = AuditController;
+export default AuditController;

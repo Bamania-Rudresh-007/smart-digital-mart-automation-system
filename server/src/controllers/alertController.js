@@ -1,5 +1,5 @@
-const { Alert, AlertRule, Notification } = require('../models');
-const ApiResponse = require('../utils/apiResponse');
+import { Alert, AlertRule, Notification } from '../models/index.js';
+import ApiResponse from '../utils/apiResponse.js';
 
 class AlertController {
   static async getAlerts(req, res, next) {
@@ -97,4 +97,4 @@ class AlertController {
   }
 }
 
-module.exports = AlertController;
+export default AlertController;

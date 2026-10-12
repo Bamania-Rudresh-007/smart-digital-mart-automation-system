@@ -1,6 +1,6 @@
-const AuthService = require('../services/authService');
-const ApiResponse = require('../utils/apiResponse');
-const { User, Role, Store } = require('../models');
+import AuthService from '../services/authService.js';
+import ApiResponse from '../utils/apiResponse.js';
+import { User, Role, Store } from '../models/index.js';
 
 class AuthController {
   static async register(req, res, next) {
@@ -79,4 +79,4 @@ class AuthController {
   }
 }
 
-module.exports = AuthController;
+export default AuthController;

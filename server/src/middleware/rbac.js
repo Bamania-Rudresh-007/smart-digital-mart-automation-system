@@ -1,4 +1,4 @@
-const ApiResponse = require('../utils/apiResponse');
+import ApiResponse from '../utils/apiResponse.js';
 
 const requirePermission = (moduleName, action) => {
   return (req, res, next) => {
@@ -45,4 +45,4 @@ const enforceStoreScope = (req, res, next) => {
   next();
 };
 
-module.exports = { requirePermission, enforceStoreScope };
+export { requirePermission, enforceStoreScope };

@@ -1,6 +1,6 @@
-const { User, Role, Permission, Store } = require('../models');
-const ApiResponse = require('../utils/apiResponse');
-const AuditService = require('../services/auditService');
+import { User, Role, Permission, Store } from '../models/index.js';
+import ApiResponse from '../utils/apiResponse.js';
+import AuditService from '../services/auditService.js';
 
 class UserController {
   static async getUsers(req, res, next) {
@@ -121,4 +121,4 @@ class UserController {
   }
 }
 
-module.exports = UserController;
+export default UserController;

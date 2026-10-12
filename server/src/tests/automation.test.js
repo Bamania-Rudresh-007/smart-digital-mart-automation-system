@@ -1,7 +1,7 @@
-const ExpiryEngine = require('../services/expiryEngine');
-const ReorderEngine = require('../services/reorderEngine');
-const ProductController = require('../controllers/productController');
-const {
+import ExpiryEngine from '../services/expiryEngine.js';
+import ReorderEngine from '../services/reorderEngine.js';
+import ProductController from '../controllers/productController.js';
+import {
   sequelize,
   Store,
   User,
@@ -13,7 +13,7 @@ const {
   PurchaseOrder,
   POItem,
   Alert
-} = require('../models');
+} from '../models/index.js';
 
 describe('Expiry detection and automatic reorder workflows', () => {
   beforeAll(async () => {

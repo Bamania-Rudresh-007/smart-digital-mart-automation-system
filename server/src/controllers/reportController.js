@@ -1,7 +1,7 @@
-const { Op } = require('sequelize');
-const { Sale, SaleItem, Product, Batch, Category, Store, sequelize } = require('../models');
-const ApiResponse = require('../utils/apiResponse');
-const ExportUtils = require('../utils/exportUtils');
+import { Op } from 'sequelize';
+import { Sale, SaleItem, Product, Batch, Category, Store, sequelize } from '../models/index.js';
+import ApiResponse from '../utils/apiResponse.js';
+import ExportUtils from '../utils/exportUtils.js';
 
 class ReportController {
   // --- DAILY / PERIODIC SALES REPORT ---
@@ -274,4 +274,4 @@ class ReportController {
   }
 }
 
-module.exports = ReportController;
+export default ReportController;

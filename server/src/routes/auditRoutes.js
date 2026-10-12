@@ -1,11 +1,11 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const AuditController = require('../controllers/auditController');
-const { authenticate } = require('../middleware/auth');
-const { requirePermission } = require('../middleware/rbac');
+import AuditController from '../controllers/auditController.js';
+import { authenticate } from '../middleware/auth.js';
+import { requirePermission } from '../middleware/rbac.js';
 
 router.use(authenticate);
 
 router.get('/', requirePermission('AuditLogs', 'read'), AuditController.getAuditLogs);
 
-module.exports = router;
+export default router;
