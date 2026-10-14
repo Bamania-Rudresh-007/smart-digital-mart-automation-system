@@ -64,7 +64,7 @@ const Register = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="auth-shell min-h-screen bg-slate-900 flex items-center justify-center p-4 relative overflow-hidden">
       <div className="w-full max-w-lg bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 shadow-2xl relative z-10">
         <div className="text-center mb-6">
           <div className="inline-flex items-center justify-center p-3 bg-blue-600/10 text-blue-500 rounded-2xl mb-2">

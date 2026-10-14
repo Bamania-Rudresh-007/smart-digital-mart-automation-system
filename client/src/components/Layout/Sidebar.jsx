@@ -33,7 +33,7 @@ const Sidebar = () => {
   ];
 
   return (
-    <aside className="w-64 bg-slate-900 text-slate-300 flex flex-col shrink-0 min-h-[calc(100vh-4rem)]">
+    <aside className="app-sidebar w-64 flex flex-col shrink-0 min-h-[calc(100vh-4rem)]">
       <div className="p-4 flex-1 space-y-1">
         <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">Navigation Menu</div>
         {navItems.filter(i => i.show).map(item => {
@@ -43,15 +43,13 @@ const Sidebar = () => {
               key={item.path}
               to={item.path}
               className={({ isActive }) =>
-                `flex items-center space-x-3 px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
-                  isActive
-                    ? 'bg-blue-600 text-white font-semibold shadow-md shadow-blue-600/30'
-                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
+                `app-sidebar-link flex items-center space-x-3 px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
+                  isActive ? 'active font-semibold' : ''
                 }`
               }
             >
               <Icon className="w-4 h-4 shrink-0" />
-              <span>{item.label}</span>
+              <span className="app-sidebar-label">{item.label}</span>
             </NavLink>
           );
         })}

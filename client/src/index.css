@@ -4,9 +4,175 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  color-scheme: light;
+  --surface: #e9eef4;
+  --surface-shadow: #cbd3dd;
+  --surface-highlight: #ffffff;
+  --ink: #344256;
+}
+
+html.dark {
+  color-scheme: dark;
+  --surface: #0f172a;
+  --surface-shadow: #020617;
+  --surface-highlight: #1e293b;
+  --ink: #f1f5f9;
+}
+
 body {
   font-family: 'Inter', sans-serif;
   @apply bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
+  background-color: var(--surface);
+}
+
+html:not(.dark) body {
+  color: var(--ink);
+}
+
+html:not(.dark) [class~="bg-white"],
+html:not(.dark) [class~="bg-slate-50"],
+html:not(.dark) [class~="bg-slate-100"],
+html:not(.dark) [class~="bg-slate-200"] {
+  background-color: var(--surface) !important;
+}
+
+html:not(.dark) [class~="border-slate-200"],
+html:not(.dark) [class~="border-slate-100"],
+html:not(.dark) [class~="border-slate-200/80"] {
+  border-color: #d5dde6 !important;
+}
+
+html:not(.dark) [class~="bg-white"][class~="rounded-xl"],
+html:not(.dark) [class~="bg-white"][class~="rounded-2xl"],
+html:not(.dark) [class~="bg-slate-50"][class~="rounded-xl"],
+html:not(.dark) [class~="bg-slate-50"][class~="rounded-2xl"],
+html:not(.dark) [class~="bg-slate-100"][class~="rounded-xl"],
+html:not(.dark) [class~="bg-slate-100"][class~="rounded-2xl"] {
+  border-color: transparent !important;
+  box-shadow: 7px 7px 15px var(--surface-shadow), -7px -7px 15px var(--surface-highlight) !important;
+}
+
+html:not(.dark) input:not([type="checkbox"]):not([type="radio"]),
+html:not(.dark) select,
+html:not(.dark) textarea {
+  border-color: transparent !important;
+  background-color: #e4eaf1 !important;
+  color: #344256 !important;
+  box-shadow: inset 3px 3px 6px #cbd3dc, inset -3px -3px 6px #ffffff !important;
+}
+
+html:not(.dark) input::placeholder,
+html:not(.dark) textarea::placeholder {
+  color: #929dac;
+}
+
+html:not(.dark) :is(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid #68866f;
+  outline-offset: 3px;
+}
+
+.app-sidebar {
+  background: var(--surface);
+  box-shadow: inset -1px 0 #d7dfe6;
+}
+
+html.dark .app-sidebar {
+  box-shadow: inset -1px 0 #1e293b;
+}
+
+.app-sidebar-link {
+  color: #758296;
+}
+
+.app-sidebar-link:not(.active):hover {
+  background: var(--surface);
+  box-shadow: inset 3px 3px 6px #cbd3dd, inset -3px -3px 6px #ffffff;
+  color: #344256;
+}
+
+.app-sidebar-link.active {
+  background: #587360;
+  box-shadow: 4px 4px 9px #c4cec9, -3px -3px 8px #ffffff;
+  color: #fff;
+}
+
+html.dark .app-sidebar-link {
+  color: #94a3b8;
+}
+
+html.dark .app-sidebar-link:not(.active):hover {
+  box-shadow: inset 3px 3px 6px #020617, inset -3px -3px 6px #1e293b;
+  color: #e2e8f0;
+}
+
+html.dark .app-sidebar-link.active {
+  box-shadow: 4px 4px 9px #020617, -3px -3px 8px #1e293b;
+  color: #fff;
+}
+
+.app-navbar {
+  background: var(--surface);
+  border-color: #d5dde6;
+  box-shadow: 0 4px 16px #d3dbe344;
+}
+
+html.dark .app-navbar {
+  border-color: #1e293b;
+  box-shadow: 0 4px 16px #02061755;
+}
+
+.auth-shell {
+  background:
+    radial-gradient(ellipse at 14% 10%, #f8faf6 0, transparent 36%),
+    radial-gradient(ellipse at 91% 92%, #dce6df 0, transparent 32%),
+    var(--surface);
+}
+
+html.dark .auth-shell {
+  background:
+    radial-gradient(ellipse at 14% 10%, #17243a 0, transparent 36%),
+    radial-gradient(ellipse at 91% 92%, #182a23 0, transparent 32%),
+    var(--surface);
+}
+
+html:not(.dark) .auth-shell [class~="bg-slate-900/80"] {
+  border-color: #f8fafc;
+  background: var(--surface);
+  box-shadow: 12px 12px 26px #cbd3dd, -12px -12px 26px #ffffff;
+}
+
+html:not(.dark) .auth-shell [class~="text-white"],
+html:not(.dark) .auth-shell [class~="text-slate-300"] {
+  color: #435164;
+}
+
+html:not(.dark) .auth-shell button[class~="text-white"],
+html:not(.dark) .auth-shell a[class~="text-white"] {
+  color: #fff;
+}
+
+html:not(.dark) .auth-shell [class~="text-slate-400"] {
+  color: #778497;
+}
+
+html:not(.dark) .auth-shell [class~="border-slate-800"] {
+  border-color: #d6dee7;
+}
+
+html:not(.dark) .auth-shell [class~="bg-slate-800"],
+html:not(.dark) .auth-shell [class~="bg-slate-800/80"] {
+  background-color: #e4eaf1;
+}
+
+@media (max-width: 768px) {
+  .app-sidebar {
+    width: 4.5rem;
+  }
+
+  .app-sidebar-label {
+    display: none;
+  }
 }
 
 /* Print styles for POS receipt */

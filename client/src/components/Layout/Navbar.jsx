@@ -45,7 +45,7 @@ const Navbar = () => {
   const unreadAlerts = alerts.filter(a => a.status === 'new').length;
 
   return (
-    <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 flex items-center justify-between sticky top-0 z-30 shadow-xs">
+    <header className="app-navbar h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 flex items-center justify-between sticky top-0 z-30 shadow-xs">
       <div className="flex items-center space-x-3">
         <h1 className="text-xl font-extrabold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
           SDMAS <span className="text-xs text-slate-500 font-normal">v1.0</span>

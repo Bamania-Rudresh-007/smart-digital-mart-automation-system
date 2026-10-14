@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import Layout from './components/Layout/Layout';
+import LandingPage from './pages/LandingPage';
 import Login from './pages/Auth/Login';
 import Register from './pages/Auth/Register';
 import ForgotPassword from './pages/Auth/ForgotPassword';
@@ -42,6 +43,8 @@ const App = () => {
 
   return (
     <Routes>
+      <Route path="/" element={<LandingPage />} />
+
       {/* Public Auth Routes */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
@@ -49,8 +52,7 @@ const App = () => {
       <Route path="/reset-password" element={<ResetPassword />} />
 
       {/* Protected Layout Routes */}
-      <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-        <Route index element={<Navigate to="/dashboard" replace />} />
+      <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="products" element={<ProductsList />} />
         <Route path="batches" element={<BatchesList />} />
