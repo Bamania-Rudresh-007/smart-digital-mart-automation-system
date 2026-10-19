@@ -1,11 +1,201 @@
 import { sequelize, PurchaseOrder, POItem, GoodsReceipt, GRNItem, VendorInvoice, InvoiceItem, PurchaseMatch, Supplier, Product, Batch, StockLedger, User } from '../models/index.js';
 import ApiResponse from '../utils/apiResponse.js';
 import MatchingEngine from '../services/matchingEngine.js';
+import { validatePdfThreeWayMatch } from '../services/pdfThreeWayMatcher.js';
+import { createPurchaseOrderPdf, createValidationSamplePdf } from '../services/purchaseOrderPdf.js';
 import ExpiryEngine from '../services/expiryEngine.js';
 import AuditService from '../services/auditService.js';
 
 class PurchaseController {
   // --- PURCHASE ORDERS ---
+  static async validateDocuments(req, res, next) {
+    let transaction;
+    try {
+      const files = req.files || {};
+      const goodsReceiptNoteFile = files.goods_receipt_note?.[0];
+      const supplierInvoiceFile = files.supplier_invoice?.[0];
+      if (!goodsReceiptNoteFile || !supplierInvoiceFile) {
+        return ApiResponse.error(
+          res,
+          'Upload one PDF each for the goods receipt note and supplier invoice.',
+          400
+        );
+      }
+
+      const po = await PurchaseOrder.findByPk(req.params.id, {
+        include: [{ model: POItem, as: 'items' }]
+      });
+      if (!po || (req.targetStoreId && Number(po.store_id) !== Number(req.targetStoreId))) {
+        return ApiResponse.error(res, 'Purchase Order not found', 404);
+      }
+
+      const quantity = po.items.reduce((sum, item) => sum + Number(item.ordered_qty), 0);
+      const totalAmount = po.items.reduce(
+        (sum, item) => sum + Number(item.ordered_qty) * Number(item.agreed_unit_price),
+        0
+      );
+      if (!quantity || !totalAmount) {
+        return ApiResponse.error(res, 'Purchase Order has no valid items to match against.', 400);
+      }
+
+      const result = await validatePdfThreeWayMatch({
+        expectedPoNumber: po.po_number,
+        purchaseOrderValues: {
+          quantity,
+          unitPrice: totalAmount / quantity,
+          totalAmount
+        },
+        goodsReceiptNote: goodsReceiptNoteFile.buffer,
+        supplierInvoice: supplierInvoiceFile.buffer
+      });
+
+      transaction = await sequelize.transaction();
+      let matchRecord = await PurchaseMatch.findOne({
+        where: { po_id: po.id },
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+      if (matchRecord) {
+        await matchRecord.update({
+          match_status: result.match_status,
+          remarks: result.remarks,
+          resolved_by: null
+        }, { transaction });
+      } else {
+        matchRecord = await PurchaseMatch.create({
+          po_id: po.id,
+          match_status: result.match_status,
+          remarks: result.remarks,
+          resolved_by: null
+        }, { transaction });
+      }
+
+      const previousStatus = po.status;
+      po.status = result.match_status === 'Matched' ? 'Approved' : 'Discrepancy';
+      await po.save({ transaction });
+      await transaction.commit();
+
+      await AuditService.logAction({
+        userId: req.user.id,
+        action: 'VALIDATE_PURCHASE_DOCUMENTS',
+        tableName: 'purchase_orders',
+        recordId: po.id,
+        oldValue: { status: previousStatus },
+        newValue: { status: po.status, match_status: result.match_status, remarks: result.remarks }
+      });
+
+      return ApiResponse.success(res, 'PDF 3-Way Match completed', {
+        ...result,
+        po_id: po.id,
+        po_number: po.po_number
+      });
+    } catch (error) {
+      if (transaction && !transaction.finished) await transaction.rollback();
+      next(error);
+    }
+  }
+
+  static async downloadPurchaseOrderPdf(req, res, next) {
+    try {
+      const po = await PurchaseOrder.findByPk(req.params.id, {
+        include: [
+          { model: Supplier, as: 'supplier' },
+          { model: POItem, as: 'items', include: [{ model: Product, as: 'product' }] }
+        ]
+      });
+      if (!po || (req.targetStoreId && Number(po.store_id) !== Number(req.targetStoreId))) {
+        return ApiResponse.error(res, 'Purchase Order not found', 404);
+      }
+
+      const pdf = await createPurchaseOrderPdf(po);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${po.po_number}.pdf"`);
+      return res.send(pdf);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async downloadValidationSample(req, res, next) {
+    try {
+      const { documentType, scenario } = req.params;
+      if (!['grn', 'invoice'].includes(documentType) || !['matching', 'mismatch'].includes(scenario)) {
+        return ApiResponse.error(res, 'Unsupported validation sample requested.', 400);
+      }
+
+      const po = await PurchaseOrder.findByPk(req.params.id, {
+        include: [{ model: POItem, as: 'items' }]
+      });
+      if (!po || (req.targetStoreId && Number(po.store_id) !== Number(req.targetStoreId))) {
+        return ApiResponse.error(res, 'Purchase Order not found', 404);
+      }
+
+      const pdf = await createValidationSamplePdf(
+        po,
+        documentType,
+        scenario === 'matching' ? 'matching' : 'mismatch'
+      );
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${po.po_number}-${documentType}-${scenario}.pdf"`
+      );
+      return res.send(pdf);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async deletePurchaseOrder(req, res, next) {
+    let transaction;
+    try {
+      transaction = await sequelize.transaction();
+      const po = await PurchaseOrder.findByPk(req.params.id, {
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+      if (!po || (req.targetStoreId && Number(po.store_id) !== Number(req.targetStoreId))) {
+        await transaction.rollback();
+        return ApiResponse.error(res, 'Purchase Order not found', 404);
+      }
+      if (!['Draft', 'Rejected'].includes(po.status)) {
+        await transaction.rollback();
+        return ApiResponse.error(res, 'Only Draft or Rejected purchase orders can be deleted.', 409);
+      }
+
+      const [receiptCount, invoiceCount] = await Promise.all([
+        GoodsReceipt.count({ where: { po_id: po.id }, transaction }),
+        VendorInvoice.count({ where: { po_id: po.id }, transaction })
+      ]);
+      if (receiptCount || invoiceCount) {
+        await transaction.rollback();
+        return ApiResponse.error(
+          res,
+          'This purchase order has linked receiving or invoice records and cannot be deleted.',
+          409
+        );
+      }
+
+      await PurchaseMatch.destroy({ where: { po_id: po.id }, transaction });
+      await POItem.destroy({ where: { po_id: po.id }, transaction });
+      await po.destroy({ transaction });
+      await transaction.commit();
+
+      await AuditService.logAction({
+        userId: req.user.id,
+        action: 'DELETE',
+        tableName: 'purchase_orders',
+        recordId: po.id,
+        oldValue: { po_number: po.po_number, status: po.status }
+      });
+
+      return ApiResponse.success(res, 'Purchase Order deleted.');
+    } catch (error) {
+      if (transaction && !transaction.finished) await transaction.rollback();
+      next(error);
+    }
+  }
+
   static async getPurchaseOrders(req, res, next) {
     try {
       const where = {};
@@ -224,10 +414,12 @@ class PurchaseController {
       await po.save({ transaction });
       await transaction.commit();
 
-      // Trigger 3-Way Match Check
-      const matchResult = await MatchingEngine.validateThreeWayMatch(po_id);
-
-      return ApiResponse.success(res, 'GRN submitted and stock ledger updated', { grn, matchResult }, 201);
+      return ApiResponse.success(
+        res,
+        'GRN submitted and stock ledger updated. Upload the GRN and invoice PDFs to run 3-Way matching against the saved Purchase Order.',
+        { grn },
+        201
+      );
     } catch (error) {
       if (transaction && !transaction.finished) await transaction.rollback();
       next(error);
@@ -288,10 +480,12 @@ class PurchaseController {
       }
       await transaction.commit();
 
-      // Trigger 3-Way Match Check
-      const matchResult = await MatchingEngine.validateThreeWayMatch(po_id, req.user.id);
-
-      return ApiResponse.success(res, 'Vendor invoice logged and 3-Way match evaluated', { invoice, matchResult }, 201);
+      return ApiResponse.success(
+        res,
+        'Vendor invoice logged. Upload the GRN and invoice PDFs to run 3-Way matching against the saved Purchase Order.',
+        { invoice },
+        201
+      );
     } catch (error) {
       if (transaction && !transaction.finished) await transaction.rollback();
       next(error);
@@ -311,15 +505,15 @@ class PurchaseController {
         newValue: {
           follow_up_po_id: result.followUpPO?.id || null,
           manager_remarks: remarks,
-          matching_result: result.match.remarks
+          matching_result: result.match?.remarks || 'Upload the GRN and invoice PDFs to rerun 3-Way matching against the saved Purchase Order.'
         }
       });
 
       return ApiResponse.success(
         res,
         result.followUpPO
-          ? `Received quantity accepted; remaining quantity carried forward to ${result.followUpPO.po_number}`
-          : 'Received quantity accepted and 3-Way matching rerun',
+          ? `Received quantity accepted; remaining quantity carried forward to ${result.followUpPO.po_number}. Upload the GRN and invoice PDFs to rerun matching.`
+          : 'Received quantity accepted. Upload the GRN and invoice PDFs to rerun matching.',
         result
       );
     } catch (error) {
