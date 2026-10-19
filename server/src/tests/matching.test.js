@@ -159,7 +159,7 @@ describe('3-Way Matching Engine Unit Tests', () => {
     expect(result.followUpPO.status).toBe('Draft');
     const carriedItem = await POItem.findOne({ where: { po_id: result.followUpPO.id } });
     expect(carriedItem.ordered_qty).toBe(12);
-    expect(result.match.match_status).toBe('Matched');
-    expect(result.match.po.status).toBe('Approved');
+    expect(result.match).toBeNull();
+    expect(result.po.status).toBe('Discrepancy');
   });
 });
