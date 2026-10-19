@@ -5,6 +5,12 @@ import { User, Role, Store, RefreshToken, PasswordReset, sequelize } from '../mo
 import NotificationService from './notificationService.js';
 import AuditService from './auditService.js';
 
+const invalidCredentialsError = () => {
+  const error = new Error('Invalid email or password');
+  error.statusCode = 401;
+  return error;
+};
+
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_sdmas_access_token_key_2026';
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'super_secret_sdmas_refresh_token_key_2026';
 
@@ -103,12 +109,12 @@ class AuthService {
     });
 
     if (!user) {
-      throw new Error('Invalid email or password');
+      throw invalidCredentialsError();
     }
 
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
-      throw new Error('Invalid email or password');
+      throw invalidCredentialsError();
     }
 
     if (user.status === 'pending') {
