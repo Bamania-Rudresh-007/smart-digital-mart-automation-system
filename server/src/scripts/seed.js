@@ -103,7 +103,7 @@ async function seedDatabase() {
       'Procurement Officer': {
         Products: ['read'],
         Batches: ['read'],
-        PurchaseOrders: ['read', 'create', 'update'],
+        PurchaseOrders: ['read', 'create', 'update', 'delete'],
         GRN: ['create'],
         VendorInvoices: ['create'],
         Reports: ['read']
