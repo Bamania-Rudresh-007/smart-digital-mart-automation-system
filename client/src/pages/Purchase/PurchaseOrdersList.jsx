@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, Plus, CheckCircle, AlertTriangle, FileText, Upload, ShieldAlert, ClipboardList, PackageCheck, ReceiptText } from 'lucide-react';
+import { ShoppingCart, Plus, CheckCircle, AlertTriangle, FileText, Upload, ShieldAlert, ClipboardList, PackageCheck, ReceiptText, FileCheck2, Download, Trash2 } from 'lucide-react';
 import Badge from '../../components/Common/Badge';
 import Modal from '../../components/Common/Modal';
 import api from '../../services/api';
@@ -15,6 +15,12 @@ const PurchaseOrdersList = () => {
   const [isGRNModal, setIsGRNModal] = useState(false);
   const [isInvoiceModal, setIsInvoiceModal] = useState(false);
   const [isOverrideModal, setIsOverrideModal] = useState(false);
+  const [isPdfValidationModal, setIsPdfValidationModal] = useState(false);
+  const [pdfFiles, setPdfFiles] = useState({});
+  const [pdfValidationResult, setPdfValidationResult] = useState(null);
+  const [pdfValidationError, setPdfValidationError] = useState('');
+  const [isValidatingPdfs, setIsValidatingPdfs] = useState(false);
+  const [pdfValidationKey, setPdfValidationKey] = useState(0);
 
   // Forms
   const [poForm, setPoForm] = useState({ supplier_id: '', items: [{ product_id: '', ordered_qty: 10, agreed_unit_price: 100 }] });
@@ -186,6 +192,67 @@ const PurchaseOrdersList = () => {
     }
   };
 
+  const openPdfValidation = (po) => {
+    setSelectedPO(po);
+    setPdfFiles({});
+    setPdfValidationResult(null);
+    setPdfValidationError('');
+    setPdfValidationKey(key => key + 1);
+    setIsPdfValidationModal(true);
+  };
+
+  const submitPdfValidation = async (e) => {
+    e.preventDefault();
+    setPdfValidationError('');
+    setIsValidatingPdfs(true);
+    const formData = new FormData();
+    formData.append('goods_receipt_note', pdfFiles.goods_receipt_note);
+    formData.append('supplier_invoice', pdfFiles.supplier_invoice);
+
+    try {
+      const response = await api.post(
+        `/purchases/${selectedPO.id}/validate-documents`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
+      );
+      setPdfValidationResult(response.data.data);
+      fetchPOs();
+    } catch (error) {
+      setPdfValidationError(error.response?.data?.message || 'Unable to validate these PDFs.');
+    } finally {
+      setIsValidatingPdfs(false);
+    }
+  };
+
+  const downloadPdf = async (url, filename) => {
+    try {
+      const response = await api.get(url, { responseType: 'blob' });
+      const objectUrl = URL.createObjectURL(response.data);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    } catch (error) {
+      alert(error.response?.data?.message || 'Unable to download the PDF.');
+    }
+  };
+
+  const deletePO = async (po) => {
+    if (!window.confirm(`Delete ${po.po_number}? Only draft or rejected orders without receiving or invoice records can be deleted.`)) {
+      return;
+    }
+
+    try {
+      await api.delete(`/purchases/${po.id}`);
+      fetchPOs();
+    } catch (error) {
+      alert(error.response?.data?.message || 'Unable to delete this purchase order.');
+    }
+  };
+
   const getStatusBadge = (status) => {
     switch (status) {
       case 'Approved': return <Badge variant="success">Approved</Badge>;
@@ -216,7 +283,7 @@ const PurchaseOrdersList = () => {
         <div className="mb-4">
           <h3 className="text-sm font-bold text-slate-900 dark:text-white">What does 3-way matching check?</h3>
           <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
-            Before approving payment, the system compares three records for the same purchase:
+            For each purchase order, the system generates the PO document from its saved items. Upload the supplier's GRN and invoice, and it checks quantity, unit price, total amount, and PO reference:
           </p>
         </div>
         <div className="grid gap-3 md:grid-cols-3">
@@ -251,7 +318,7 @@ const PurchaseOrdersList = () => {
         <div className="mt-3 flex items-start gap-2 text-[11px] leading-5 text-slate-600 dark:text-slate-400">
           <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
           <p>
-            A match means quantities, unit prices, and invoice totals are within the configured tolerance (2% by default), so payment is auto-approved. A discrepancy lists what differs; correct the GRN or invoice, or use the manager's quantity carry-forward/override action.
+            Validation uses the selected purchase order's saved quantities and prices as the source of truth. Both supplier PDFs must reference that PO. Text-based PDFs with clearly labeled summary values are supported; scanned PDFs require OCR and cannot be validated here. The configured tolerance is 2% by default. A successful validation marks the purchase order Approved; mismatches are listed for review.
           </p>
         </div>
       </section>
@@ -279,7 +346,7 @@ const PurchaseOrdersList = () => {
                     {po.match ? (
                       <span className="font-bold">{po.match.match_status}: {po.match.remarks}</span>
                     ) : (
-                      <span className="text-slate-400 italic">Pending GRN & Invoice</span>
+                      <span className="text-slate-400 italic">No validation result yet</span>
                     )}
                   </td>
                   <td className="p-4">{po.is_auto_generated ? <Badge variant="warning">Auto Reorder</Badge> : 'Manual'}</td>
@@ -287,8 +354,12 @@ const PurchaseOrdersList = () => {
                     {po.status === 'Draft' && (
                       <button
                         onClick={async () => {
-                          await api.put(`/purchases/${po.id}/status`, { status: 'Sent' });
-                          fetchPOs();
+                          try {
+                            await api.put(`/purchases/${po.id}/status`, { status: 'Sent' });
+                            fetchPOs();
+                          } catch (error) {
+                            alert(error.response?.data?.message || 'Unable to send this purchase order.');
+                          }
                         }}
                         className="px-2.5 py-1 bg-blue-100 text-blue-800 rounded-lg font-bold text-[11px]"
                       >
@@ -296,10 +367,37 @@ const PurchaseOrdersList = () => {
                       </button>
                     )}
 
+                    {po.status !== 'Draft' && (
+                      <button
+                        onClick={() => downloadPdf(`/purchases/${po.id}/pdf`, `${po.po_number}.pdf`)}
+                        className="px-2.5 py-1 bg-slate-100 text-slate-800 rounded-lg font-bold text-[11px] dark:bg-slate-700 dark:text-slate-100"
+                      >
+                        <span className="inline-flex items-center gap-1"><Download className="h-3 w-3" /> Download PO PDF</span>
+                      </button>
+                    )}
+
                     {(po.status === 'Sent' || po.status === 'Partially Received' ||
                       (po.status === 'Discrepancy' && getOutstandingGRNItems(po).length > 0)) && (
                       <button onClick={() => openGRN(po)} className="px-2.5 py-1 bg-purple-100 text-purple-800 rounded-lg font-bold text-[11px]">
                         {po.status === 'Discrepancy' ? 'Correct GRN' : 'Receive GRN'}
+                      </button>
+                    )}
+
+                    {po.status !== 'Draft' && (
+                      <button
+                        onClick={() => openPdfValidation(po)}
+                        className="px-2.5 py-1 bg-blue-100 text-blue-800 rounded-lg font-bold text-[11px]"
+                      >
+                        <span className="inline-flex items-center gap-1"><FileCheck2 className="h-3 w-3" /> Validate Documents</span>
+                      </button>
+                    )}
+
+                    {['Draft', 'Rejected'].includes(po.status) && (
+                      <button
+                        onClick={() => deletePO(po)}
+                        className="px-2.5 py-1 bg-rose-100 text-rose-800 rounded-lg font-bold text-[11px] dark:bg-rose-950/40 dark:text-rose-300"
+                      >
+                        <span className="inline-flex items-center gap-1"><Trash2 className="h-3 w-3" /> Delete</span>
                       </button>
                     )}
 
@@ -333,6 +431,116 @@ const PurchaseOrdersList = () => {
           </table>
         </div>
       </div>
+
+      <Modal
+        isOpen={isPdfValidationModal}
+        onClose={() => setIsPdfValidationModal(false)}
+        title={`Validate PDFs for ${selectedPO?.po_number || 'Purchase Order'}`}
+        maxWidth="max-w-3xl"
+      >
+        <form key={pdfValidationKey} onSubmit={submitPdfValidation} className="space-y-5">
+          <p className="text-xs leading-5 text-slate-600 dark:text-slate-400">
+            The Purchase Order PDF is generated from this saved purchase order and is checked automatically. Upload the supplier's GRN and invoice PDFs; both must include this PO number and clearly labeled quantities, prices, and totals. Each file must be no larger than 10 MB.
+          </p>
+          <div className="grid gap-4 md:grid-cols-2">
+            {[
+              ['goods_receipt_note', 'Goods Receipt Note (GRN) PDF'],
+              ['supplier_invoice', 'Supplier Invoice PDF']
+            ].map(([field, label]) => (
+              <label key={field} className="rounded-xl border border-slate-200 p-4 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-300">
+                <span className="mb-2 block">{label} <span className="text-rose-500">*</span></span>
+                <input
+                  type="file"
+                  accept=".pdf,application/pdf"
+                  required
+                  onChange={event => {
+                    const selectedFile = event.target.files?.[0] || null;
+                    setPdfFiles(current => ({ ...current, [field]: selectedFile }));
+                    setPdfValidationResult(null);
+                    setPdfValidationError('');
+                  }}
+                  className="block w-full text-[11px] file:mr-2 file:rounded-lg file:border-0 file:bg-blue-50 file:px-2 file:py-1.5 file:text-[11px] file:font-bold file:text-blue-700"
+                />
+              </label>
+            ))}
+          </div>
+          {selectedPO && (
+            <div className="space-y-2 rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+              <p className="text-xs font-bold text-slate-800 dark:text-white">Download PDFs to test this purchase order</p>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  ['grn', 'matching', 'Matching GRN'],
+                  ['invoice', 'matching', 'Matching invoice'],
+                  ['grn', 'mismatch', 'GRN with quantity mismatch'],
+                  ['invoice', 'mismatch', 'Invoice with price mismatch']
+                ].map(([documentType, scenario, label]) => (
+                  <button
+                    key={`${documentType}-${scenario}`}
+                    type="button"
+                    onClick={() => downloadPdf(
+                      `/purchases/${selectedPO.id}/validation-samples/${documentType}/${scenario}`,
+                      `${selectedPO.po_number}-${documentType}-${scenario}.pdf`
+                    )}
+                    className="rounded-lg bg-slate-100 px-3 py-2 text-[11px] font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                  >
+                    <span className="inline-flex items-center gap-1"><Download className="h-3 w-3" /> {label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {pdfValidationError && (
+            <p role="alert" className="rounded-lg bg-rose-50 p-3 text-xs font-semibold text-rose-700 dark:bg-rose-950/30 dark:text-rose-300">
+              {pdfValidationError}
+            </p>
+          )}
+          <button
+            type="submit"
+            disabled={isValidatingPdfs}
+            className="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isValidatingPdfs ? 'Reading and comparing PDFs…' : 'Run 3-Way Validation'}
+          </button>
+        </form>
+
+        {pdfValidationResult && (
+          <section className="mt-6 space-y-4 border-t border-slate-200 pt-5 dark:border-slate-700" aria-live="polite">
+            <div className={`rounded-xl p-4 ${pdfValidationResult.match_status === 'Matched' ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300' : 'bg-rose-50 text-rose-800 dark:bg-rose-950/30 dark:text-rose-300'}`}>
+              <h4 className="font-bold">
+                {pdfValidationResult.match_status === 'Matched' ? 'Matched — purchase order approved' : 'Discrepancy found'}
+              </h4>
+              <p className="mt-1 text-xs">{pdfValidationResult.remarks}</p>
+              <p className="mt-2 text-[11px]">Allowed tolerance: {pdfValidationResult.tolerance_percent}%</p>
+            </div>
+            <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-500 dark:bg-slate-800">
+                  <tr>
+                    <th className="p-3">Parameter</th>
+                    <th className="p-3">Documents</th>
+                    <th className="p-3">Values</th>
+                    <th className="p-3">Variance</th>
+                    <th className="p-3">Result</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {pdfValidationResult.checks.map((check, index) => (
+                    <tr key={`${check.parameter}-${index}`}>
+                      <td className="p-3 font-semibold">{check.parameter}</td>
+                      <td className="p-3">{check.documents}</td>
+                      <td className="p-3">{check.value_a} / {check.value_b}</td>
+                      <td className="p-3">{check.variance_percent === null ? 'Not measurable' : `${check.variance_percent}%`}</td>
+                      <td className={`p-3 font-bold ${check.within_tolerance ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        {check.within_tolerance ? 'Pass' : 'Mismatch'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
+      </Modal>
 
       {/* Create PO Modal */}
       <Modal isOpen={isCreateModal} onClose={() => setIsCreateModal(false)} title="Create Purchase Order">
