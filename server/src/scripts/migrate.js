@@ -1,7 +1,7 @@
 import { pathToFileURL } from 'node:url';
 import sequelize from '../config/database.js';
 import logger from '../utils/logger.js';
-import '../models/index.js';
+import { Permission, Role } from '../models/index.js';
 
 async function migrate() {
   try {
@@ -12,6 +12,15 @@ async function migrate() {
     const productColumns = await queryInterface.describeTable('products');
     if (productColumns.dummyjson_id) {
       await queryInterface.removeColumn('products', 'dummyjson_id');
+    }
+
+    const procurementRole = await Role.findOne({ where: { role_name: 'Procurement Officer' } });
+    if (procurementRole) {
+      const [deletePermission] = await Permission.findOrCreate({
+        where: { module: 'PurchaseOrders', action: 'delete' },
+        defaults: { module: 'PurchaseOrders', action: 'delete' }
+      });
+      await procurementRole.addPermission(deletePermission);
     }
 
     logger.info('Database migration completed successfully!');
