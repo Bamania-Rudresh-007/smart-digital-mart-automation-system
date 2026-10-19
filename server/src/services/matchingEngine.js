@@ -278,8 +278,7 @@ class MatchingEngine {
       }
 
       await transaction.commit();
-      const match = await this.validateThreeWayMatch(poId, managerUserId);
-      return { po, followUpPO, match };
+      return { po, followUpPO, match: null };
     } catch (error) {
       if (!transaction.finished) await transaction.rollback();
       throw error;
