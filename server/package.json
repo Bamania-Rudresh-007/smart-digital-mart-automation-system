@@ -27,6 +27,7 @@
     "mysql2": "^3.9.8",
     "node-cron": "^3.0.3",
     "nodemailer": "^6.9.13",
+    "pdf-parse": "^2.4.5",
     "pdfkit": "^0.15.0",
     "pdfkit-table": "^0.1.99",
     "sequelize": "^6.37.3",
